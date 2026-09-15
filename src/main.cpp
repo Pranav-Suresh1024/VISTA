@@ -1,9 +1,12 @@
+#include <filesystem>
+#include <fstream>
 #include <iomanip>
 #include <iostream>
 #include <string>
 
 #include "analysis.hpp"
 #include "ast.hpp"
+#include "codegen.hpp"
 #include "diagnostic.hpp"
 #include "parser.hpp"
 #include "scanner.hpp"
@@ -16,6 +19,7 @@ namespace {
 void print_help(std::ostream& output) {
     output << "VISTA - Validation and Interface Specification Translation Analyzer\n\n"
            << "Usage: vista <source.vista> --emit <tokens|ast|symbols|dependencies|graph|diagnostics>\n"
+           << "       vista <source.vista> --emit html --out-dir <directory>\n"
            << "       vista [option]\n\n"
            << "Options:\n"
            << "  --help       Show this help message\n"
@@ -25,7 +29,8 @@ void print_help(std::ostream& output) {
            << "  --emit symbols Print the field symbol table\n"
            << "  --emit dependencies  Print conditional field dependencies\n"
            << "  --emit graph   Print the dependency graph in DOT format\n"
-           << "  --emit diagnostics  Run semantic and dependency analysis\n";
+           << "  --emit diagnostics  Run semantic and dependency analysis\n"
+           << "  --emit html --out-dir DIR  Generate a standalone HTML form\n";
 }
 
 void print_tokens(const std::vector<vista::Token>& tokens) {
@@ -62,7 +67,23 @@ int main(int argc, char* argv[]) {
         return 0;
     }
 
-    if (argc != 4 || std::string(argv[2]) != "--emit") {
+    if ((argc != 4 && argc != 6) || std::string(argv[2]) != "--emit") {
+        std::cerr << "VISTA: invalid command-line arguments\n"
+                  << "Run 'vista --help' to see the available options.\n";
+        return 2;
+    }
+
+    const std::string emit_mode = argv[3];
+    if (emit_mode != "tokens" && emit_mode != "ast" && emit_mode != "symbols" &&
+        emit_mode != "dependencies" && emit_mode != "graph" &&
+        emit_mode != "diagnostics" && emit_mode != "html") {
+        std::cerr << "VISTA: unknown emit mode '" << emit_mode << "'\n";
+        return 2;
+    }
+    const bool html_mode = emit_mode == "html";
+    if ((html_mode && (argc != 6 || std::string(argv[4]) != "--out-dir" ||
+                       std::string(argv[5]).empty())) ||
+        (!html_mode && argc != 4)) {
         std::cerr << "VISTA: invalid command-line arguments\n"
                   << "Run 'vista --help' to see the available options.\n";
         return 2;
@@ -71,14 +92,6 @@ int main(int argc, char* argv[]) {
     const vista::ScanResult result = vista::scan_file(first_argument);
     if (!result.input_opened) {
         std::cerr << "VISTA: cannot open input file '" << first_argument << "'\n";
-        return 2;
-    }
-
-    const std::string emit_mode = argv[3];
-    if (emit_mode != "tokens" && emit_mode != "ast" && emit_mode != "symbols" &&
-        emit_mode != "dependencies" && emit_mode != "graph" &&
-        emit_mode != "diagnostics") {
-        std::cerr << "VISTA: unknown emit mode '" << emit_mode << "'\n";
         return 2;
     }
 
@@ -129,10 +142,39 @@ int main(int argc, char* argv[]) {
         for (const vista::Diagnostic& diagnostic : analysis_result.diagnostics) {
             std::cerr << vista::format_diagnostic(first_argument, diagnostic) << '\n';
         }
+        if (!analysis_result.succeeded()) {
+            return 1;
+        }
+        if (emit_mode == "html") {
+            const std::filesystem::path output_directory = argv[5];
+            std::error_code error;
+            std::filesystem::create_directories(output_directory, error);
+            if (error) {
+                std::cerr << "VISTA: cannot create output directory '"
+                          << output_directory.string() << "': " << error.message() << '\n';
+                return 2;
+            }
+            const std::filesystem::path output_path = output_directory / "form.html";
+            std::ofstream output_file(output_path, std::ios::binary);
+            if (!output_file) {
+                std::cerr << "VISTA: cannot write output file '"
+                          << output_path.string() << "'\n";
+                return 2;
+            }
+            output_file << vista::generate_html(
+                *parse_result.form, semantic_result, analysis_result);
+            if (!output_file) {
+                std::cerr << "VISTA: failed while writing output file '"
+                          << output_path.string() << "'\n";
+                return 2;
+            }
+            std::cout << "Generated " << output_path.string() << '\n';
+            return 0;
+        }
         if (emit_mode == "diagnostics" && analysis_result.diagnostics.empty()) {
             std::cout << "No diagnostics.\n";
         }
-        return analysis_result.succeeded() ? 0 : 1;
+        return 0;
     }
 
     return 0;

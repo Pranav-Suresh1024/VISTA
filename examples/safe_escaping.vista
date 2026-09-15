@@ -1,0 +1,7 @@
+form SafeEscaping {
+  field name: text {
+    label "Display <name> & \"alias\""
+    required
+  }
+  check name != "" message "</script><b>Required</b>"
+}

@@ -9,8 +9,8 @@ TARGET := build/vista
 GENERATED_SCANNER := build/vista_lexer.cpp
 GENERATED_PARSER := build/vista_parser.cpp
 GENERATED_PARSER_HEADER := build/vista_parser.hpp
-SOURCES := src/main.cpp src/analysis.cpp src/ast.cpp src/diagnostic.cpp src/parser.cpp src/semantic.cpp src/token.cpp
-HEADERS := include/analysis.hpp include/ast.hpp include/diagnostic.hpp include/parser.hpp include/scanner.hpp include/semantic.hpp include/token.hpp include/version.hpp
+SOURCES := src/main.cpp src/analysis.cpp src/ast.cpp src/codegen.cpp src/diagnostic.cpp src/parser.cpp src/semantic.cpp src/token.cpp
+HEADERS := include/analysis.hpp include/ast.hpp include/codegen.hpp include/diagnostic.hpp include/parser.hpp include/scanner.hpp include/semantic.hpp include/token.hpp include/version.hpp
 
 .PHONY: all test demo clean
 
@@ -34,13 +34,15 @@ test: $(TARGET)
 	@bash tests/test_parser.sh
 	@bash tests/test_semantic.sh
 	@bash tests/test_analysis.sh
+	@bash tests/test_codegen.sh
 
 demo: $(TARGET)
-	@echo "VISTA Stage 5 dependency and witness-analysis demonstration"
+	@echo "VISTA Stage 6 standalone HTML generation demonstration"
 	@echo
 	@./$(TARGET) --version
 	@echo
-	@./$(TARGET) examples/valid_scholarship.vista --emit dependencies
+	@./$(TARGET) examples/valid_scholarship.vista --emit html --out-dir out/demo
+	@echo "Open out/demo/form.html in a browser."
 	@echo
 	@./$(TARGET) examples/hidden_required.vista --emit diagnostics || true
 

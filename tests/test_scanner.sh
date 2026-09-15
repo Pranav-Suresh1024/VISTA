@@ -17,7 +17,7 @@ expect_contains() {
 }
 
 version_output="$($binary --version)"
-expect_contains "$version_output" "VISTA 0.5.0" "version output"
+expect_contains "$version_output" "VISTA 0.6.0" "version output"
 
 help_output="$($binary --help)"
 expect_contains "$help_output" "Usage: vista <source.vista> --emit <tokens|ast|symbols|dependencies|graph|diagnostics>" "help usage"
