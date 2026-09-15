@@ -1,0 +1,5 @@
+form DuplicateField {
+  field name: text { label "Name" }
+  field age: integer { label "Age" }
+  field name: text { label "Repeated name" }
+}

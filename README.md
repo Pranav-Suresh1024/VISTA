@@ -6,14 +6,14 @@ VISTA will read a small declarative form specification, validate its structure a
 
 ## Current status
 
-Stages 1 through 3 are complete. VISTA now has a repeatable WSL build, a positioned Flex scanner, and a Yacc-compatible Bison parser that constructs and prints a C++ abstract syntax tree.
+Stages 1 through 4 are complete. VISTA now has a repeatable WSL build, positioned Flex scanner, Yacc-compatible Bison parser, C++ AST, field symbol table, and two-pass semantic analyser.
 
 ## Requirements
 
 - Ubuntu on WSL 2
 - GNU Make
 - G++ with C++17 support
-- GNU Flex and GNU Bison for the following stages
+- GNU Flex and GNU Bison
 
 The required compiler tools are already available in the current Ubuntu WSL environment.
 
@@ -35,6 +35,8 @@ The executable is created at `build/vista`.
 ./build/vista --help
 ./build/vista examples/valid_scholarship.vista --emit tokens
 ./build/vista examples/valid_scholarship.vista --emit ast
+./build/vista examples/valid_scholarship.vista --emit symbols
+./build/vista examples/type_mismatch.vista --emit diagnostics
 ```
 
 The token table contains each token's source location, classification, and original lexeme. Whitespace and `//` comments are ignored while their positions are still counted.
@@ -46,7 +48,7 @@ make test
 make demo
 ```
 
-`make test` runs all cumulative checks. Scanner tests cover token classes, positions, lexical failures, missing files, and command-line errors. Parser tests cover every field type, declarations, operator precedence, AST output, syntax diagnostics, and the rule that parsing stops after a lexical failure.
+`make test` runs all cumulative checks. The semantic tests cover symbol insertion, labels, choice options, duplicate declarations, undefined references, type compatibility, contextual choice literals, and Boolean conditions.
 
 ## Project layout
 
@@ -54,7 +56,7 @@ make demo
 include/       C++ headers
 src/           C++ source files
 examples/      Valid and invalid VISTA inputs
-tests/         End-to-end scanner tests
+tests/         Cumulative end-to-end tests
 build/         Generated executable, not committed
 Makefile       WSL build, test, and demo commands
 README.md      Setup and current progress
@@ -63,5 +65,5 @@ README.md      Setup and current progress
 ## Exit codes
 
 - `0`: command completed successfully
-- `1`: the source contains a lexical error
+- `1`: the source contains a lexical, syntax, or semantic error
 - `2`: invalid command-line usage

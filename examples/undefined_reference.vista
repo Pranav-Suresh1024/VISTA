@@ -1,0 +1,6 @@
+form UndefinedReference {
+  field certificate: file {
+    label "Certificate"
+    show when category == reserved
+  }
+}

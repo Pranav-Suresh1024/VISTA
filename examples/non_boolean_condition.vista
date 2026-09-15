@@ -1,0 +1,6 @@
+form NonBooleanCondition {
+  field age: integer {
+    label "Age"
+    show when age
+  }
+}

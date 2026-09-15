@@ -6,6 +6,7 @@
 #include "diagnostic.hpp"
 #include "parser.hpp"
 #include "scanner.hpp"
+#include "semantic.hpp"
 #include "token.hpp"
 #include "version.hpp"
 
@@ -13,13 +14,15 @@ namespace {
 
 void print_help(std::ostream& output) {
     output << "VISTA - Validation and Interface Specification Translation Analyzer\n\n"
-           << "Usage: vista <source.vista> --emit <tokens|ast>\n"
+           << "Usage: vista <source.vista> --emit <tokens|ast|symbols|diagnostics>\n"
            << "       vista [option]\n\n"
            << "Options:\n"
            << "  --help       Show this help message\n"
            << "  --version    Show the current VISTA version\n"
            << "  --emit tokens  Print the positioned Flex token stream\n"
-           << "  --emit ast     Parse the source and print its abstract syntax tree\n";
+           << "  --emit ast     Parse the source and print its abstract syntax tree\n"
+           << "  --emit symbols Print the field symbol table\n"
+           << "  --emit diagnostics  Run semantic checks and print diagnostics\n";
 }
 
 void print_tokens(const std::vector<vista::Token>& tokens) {
@@ -69,7 +72,8 @@ int main(int argc, char* argv[]) {
     }
 
     const std::string emit_mode = argv[3];
-    if (emit_mode != "tokens" && emit_mode != "ast") {
+    if (emit_mode != "tokens" && emit_mode != "ast" && emit_mode != "symbols" &&
+        emit_mode != "diagnostics") {
         std::cerr << "VISTA: unknown emit mode '" << emit_mode << "'\n";
         return 2;
     }
@@ -84,15 +88,32 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    if (emit_mode == "ast") {
+    if (emit_mode != "tokens") {
         const vista::ParseResult parse_result = vista::parse_tokens(result.tokens);
-        for (const vista::Diagnostic& diagnostic : parse_result.diagnostics) {
-            std::cerr << vista::format_diagnostic(first_argument, diagnostic) << '\n';
-        }
         if (!parse_result.succeeded()) {
+            for (const vista::Diagnostic& diagnostic : parse_result.diagnostics) {
+                std::cerr << vista::format_diagnostic(first_argument, diagnostic) << '\n';
+            }
             return 1;
         }
-        std::cout << vista::format_ast(*parse_result.form);
+
+        if (emit_mode == "ast") {
+            std::cout << vista::format_ast(*parse_result.form);
+            return 0;
+        }
+
+        const vista::SemanticResult semantic_result =
+            vista::analyze_semantics(*parse_result.form);
+        if (emit_mode == "symbols") {
+            std::cout << vista::format_symbol_table(semantic_result.symbols);
+        }
+        for (const vista::Diagnostic& diagnostic : semantic_result.diagnostics) {
+            std::cerr << vista::format_diagnostic(first_argument, diagnostic) << '\n';
+        }
+        if (emit_mode == "diagnostics" && semantic_result.diagnostics.empty()) {
+            std::cout << "No diagnostics.\n";
+        }
+        return semantic_result.succeeded() ? 0 : 1;
     }
 
     return 0;

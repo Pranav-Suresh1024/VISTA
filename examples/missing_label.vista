@@ -1,0 +1,5 @@
+form MissingLabel {
+  field name: text {
+    required
+  }
+}

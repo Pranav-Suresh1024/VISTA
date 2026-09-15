@@ -1,0 +1,9 @@
+form InvalidChoice {
+  field category: choice { general, reserved } {
+    label "Category"
+  }
+  field certificate: file {
+    label "Certificate"
+    show when category == international
+  }
+}
