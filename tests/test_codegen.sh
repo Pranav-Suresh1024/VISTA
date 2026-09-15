@@ -63,6 +63,8 @@ if grep -Fq '</script><b>Required</b>' "$escaping_dir/form.html"; then
 fi
 
 blocked_dir="$output_root/blocked"
+mkdir -p "$blocked_dir"
+touch "$blocked_dir/form.html"
 blocked_output="$($binary examples/hidden_required.vista --emit html --out-dir "$blocked_dir" 2>&1)"
 blocked_status=$?
 if [[ $blocked_status -ne 1 ]]; then
@@ -70,7 +72,7 @@ if [[ $blocked_status -ne 1 ]]; then
     failures=$((failures + 1))
 fi
 if [[ -f "$blocked_dir/form.html" ]]; then
-    echo "FAIL: unsafe form generated form.html"
+    echo "FAIL: unsafe form left a stale or newly generated form.html"
     failures=$((failures + 1))
 fi
 if ! grep -Fq "ANL003" <<<"$blocked_output"; then
