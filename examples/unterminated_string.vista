@@ -1,0 +1,5 @@
+form BrokenString {
+  field name: text {
+    label "This label never closes
+  }
+}

@@ -1,0 +1,6 @@
+form BrokenForm {
+  field name: text {
+    label "Full name"
+    required @
+  }
+}

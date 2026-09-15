@@ -1,0 +1,14 @@
+form TokenCatalogue {
+  field title: text { label "Title" }
+  field count: integer { label "Count" }
+  field price: decimal { label "Price" }
+  field active: boolean { label "Active" }
+  field opened: date { label "Opening date" }
+  field group: choice { first, second } { label "Group" }
+  field attachment: file { label "Attachment" }
+
+  check (count < 10 or count <= 20) message "Low count"
+  check count > 0 and count >= 1 message "Positive count"
+  check price == 3.5 and price != 0.0 message "Valid price"
+  check active == true or not false message "Active state"
+}

@@ -6,7 +6,7 @@ VISTA will read a small declarative form specification, validate its structure a
 
 ## Current status
 
-Stage 1 provides the repository foundation, repeatable WSL build, version command, help command, and automated CLI checks. Source-file compilation begins in Stage 2 with the Flex scanner.
+Stages 1 and 2 are complete. The project now has a repeatable WSL build and a Flex scanner that reads a `.vista` source file, recognizes its tokens, preserves line and column positions, and reports lexical errors.
 
 ## Requirements
 
@@ -33,22 +33,27 @@ The executable is created at `build/vista`.
 ```bash
 ./build/vista --version
 ./build/vista --help
+./build/vista examples/valid_scholarship.vista --emit tokens
 ```
 
-## Verify Stage 1
+The token table contains each token's source location, classification, and original lexeme. Whitespace and `//` comments are ignored while their positions are still counted.
+
+## Verify the completed stages
 
 ```bash
 make test
 make demo
 ```
 
-`make test` verifies the version, help output, and command-line error exit code. `make demo` prints the working Stage 1 interface.
+`make test` runs the cumulative Stage 1 and Stage 2 checks. It covers valid tokenization, token positions, illegal characters, unterminated strings, missing input files, and command-line errors. `make demo` shows one valid scan and one lexical failure.
 
 ## Project layout
 
 ```text
 include/       C++ headers
 src/           C++ source files
+examples/      Valid and invalid VISTA inputs
+tests/         End-to-end scanner tests
 build/         Generated executable, not committed
 Makefile       WSL build, test, and demo commands
 README.md      Setup and current progress
@@ -57,4 +62,5 @@ README.md      Setup and current progress
 ## Exit codes
 
 - `0`: command completed successfully
+- `1`: the source contains a lexical error
 - `2`: invalid command-line usage

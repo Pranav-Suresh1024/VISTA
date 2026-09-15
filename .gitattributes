@@ -4,6 +4,7 @@
 *.hpp text eol=lf
 *.l text eol=lf
 *.y text eol=lf
+*.vista text eol=lf
 *.sh text eol=lf
 Makefile text eol=lf
 *.md text eol=lf

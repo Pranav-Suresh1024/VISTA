@@ -1,41 +1,35 @@
 CXX := g++
+FLEX := flex
 CXXFLAGS := -std=c++17 -Wall -Wextra -Wpedantic -Werror -O2 -Iinclude
+FLEX_CXXFLAGS := $(CXXFLAGS) -Wno-sign-compare -Wno-unused-function
 
 TARGET := build/vista
-SOURCES := src/main.cpp
-HEADERS := include/version.hpp
+GENERATED_SCANNER := build/vista_lexer.cpp
+SOURCES := src/main.cpp src/diagnostic.cpp src/token.cpp
+HEADERS := include/diagnostic.hpp include/scanner.hpp include/token.hpp include/version.hpp
 
 .PHONY: all test demo clean
 
 all: $(TARGET)
 
-$(TARGET): $(SOURCES) $(HEADERS)
+$(GENERATED_SCANNER): src/vista.l $(HEADERS)
 	@mkdir -p build
-	$(CXX) $(CXXFLAGS) $(SOURCES) -o $(TARGET)
+	$(FLEX) --outfile=$(GENERATED_SCANNER) src/vista.l
+
+$(TARGET): $(SOURCES) $(HEADERS) $(GENERATED_SCANNER)
+	$(CXX) $(FLEX_CXXFLAGS) $(SOURCES) $(GENERATED_SCANNER) -o $(TARGET)
 
 test: $(TARGET)
-	@version_output="$$(./$(TARGET) --version)"; \
-		test "$$version_output" = "VISTA 0.1.0" || { \
-			echo "FAIL: unexpected version output: $$version_output"; \
-			exit 1; \
-		}
-	@./$(TARGET) --help | grep -q "Usage: vista" || { \
-		echo "FAIL: help output does not contain the usage line"; \
-		exit 1; \
-	}
-	@./$(TARGET) --unknown >/dev/null 2>&1; status=$$?; \
-		test $$status -eq 2 || { \
-			echo "FAIL: unknown option returned $$status instead of 2"; \
-			exit 1; \
-		}
-	@echo "Stage 1 tests passed."
+	@bash tests/test_scanner.sh
 
 demo: $(TARGET)
-	@echo "VISTA Stage 1 demonstration"
+	@echo "VISTA Stage 2 scanner demonstration"
 	@echo
 	@./$(TARGET) --version
 	@echo
-	@./$(TARGET) --help
+	@./$(TARGET) examples/valid_scholarship.vista --emit tokens
+	@echo
+	@./$(TARGET) examples/lexical_error.vista --emit tokens || true
 
 clean:
 	@rm -rf -- build out

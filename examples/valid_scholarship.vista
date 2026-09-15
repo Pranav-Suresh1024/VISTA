@@ -1,0 +1,25 @@
+// A valid VISTA source file used by the scanner demonstration.
+form ScholarshipApplication {
+  field name: text {
+    label "Full name"
+    required
+  }
+
+  field category: choice { general, reserved } {
+    label "Applicant category"
+    required
+  }
+
+  field certificate: file {
+    label "Category certificate"
+    show when category == reserved
+    required when category == reserved
+  }
+
+  field age: integer {
+    label "Age"
+  }
+
+  check name != "" message "Enter your full name"
+  check age >= 18 and category != general message "Review the application"
+}
