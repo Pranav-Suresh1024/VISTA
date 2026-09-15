@@ -6,7 +6,7 @@ VISTA will read a small declarative form specification, validate its structure a
 
 ## Current status
 
-Stages 1 through 4 are complete. VISTA now has a repeatable WSL build, positioned Flex scanner, Yacc-compatible Bison parser, C++ AST, field symbol table, and two-pass semantic analyser.
+Stages 1 through 5 are complete. VISTA now has a repeatable WSL build, positioned Flex scanner, Yacc-compatible Bison parser, C++ AST, field symbol table, semantic analyser, dependency graph, cycle detection, and finite witness analysis.
 
 ## Requirements
 
@@ -36,7 +36,10 @@ The executable is created at `build/vista`.
 ./build/vista examples/valid_scholarship.vista --emit tokens
 ./build/vista examples/valid_scholarship.vista --emit ast
 ./build/vista examples/valid_scholarship.vista --emit symbols
+./build/vista examples/valid_scholarship.vista --emit dependencies
+./build/vista examples/valid_scholarship.vista --emit graph
 ./build/vista examples/type_mismatch.vista --emit diagnostics
+./build/vista examples/hidden_required.vista --emit diagnostics
 ```
 
 The token table contains each token's source location, classification, and original lexeme. Whitespace and `//` comments are ignored while their positions are still counted.
@@ -48,7 +51,9 @@ make test
 make demo
 ```
 
-`make test` runs all cumulative checks. The semantic tests cover symbol insertion, labels, choice options, duplicate declarations, undefined references, type compatibility, contextual choice literals, and Boolean conditions.
+`make test` runs all cumulative checks. Stage 5 tests verify dependency edges, DOT output, self-dependencies, cycles, hidden-required witnesses, and honest analysis-limit diagnostics for unsupported conditions.
+
+Witness analysis exhaustively checks finite Boolean and choice assignments. Numeric, date, and text-dependent reasoning is deliberately reported as `ANL900` rather than approximated.
 
 ## Project layout
 

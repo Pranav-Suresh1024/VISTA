@@ -1,0 +1,10 @@
+form BooleanHiddenRequired {
+  field employed: boolean {
+    label "Currently employed"
+  }
+  field employer: text {
+    label "Employer"
+    show when employed
+    required
+  }
+}

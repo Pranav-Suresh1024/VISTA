@@ -9,8 +9,8 @@ TARGET := build/vista
 GENERATED_SCANNER := build/vista_lexer.cpp
 GENERATED_PARSER := build/vista_parser.cpp
 GENERATED_PARSER_HEADER := build/vista_parser.hpp
-SOURCES := src/main.cpp src/ast.cpp src/diagnostic.cpp src/parser.cpp src/semantic.cpp src/token.cpp
-HEADERS := include/ast.hpp include/diagnostic.hpp include/parser.hpp include/scanner.hpp include/semantic.hpp include/token.hpp include/version.hpp
+SOURCES := src/main.cpp src/analysis.cpp src/ast.cpp src/diagnostic.cpp src/parser.cpp src/semantic.cpp src/token.cpp
+HEADERS := include/analysis.hpp include/ast.hpp include/diagnostic.hpp include/parser.hpp include/scanner.hpp include/semantic.hpp include/token.hpp include/version.hpp
 
 .PHONY: all test demo clean
 
@@ -33,15 +33,16 @@ test: $(TARGET)
 	@bash tests/test_scanner.sh
 	@bash tests/test_parser.sh
 	@bash tests/test_semantic.sh
+	@bash tests/test_analysis.sh
 
 demo: $(TARGET)
-	@echo "VISTA Stage 4 semantic-analysis demonstration"
+	@echo "VISTA Stage 5 dependency and witness-analysis demonstration"
 	@echo
 	@./$(TARGET) --version
 	@echo
-	@./$(TARGET) examples/valid_scholarship.vista --emit symbols
+	@./$(TARGET) examples/valid_scholarship.vista --emit dependencies
 	@echo
-	@./$(TARGET) examples/type_mismatch.vista --emit diagnostics || true
+	@./$(TARGET) examples/hidden_required.vista --emit diagnostics || true
 
 clean:
 	@rm -rf -- build out

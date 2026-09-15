@@ -1,0 +1,10 @@
+form DependencyCycle {
+  field first: boolean {
+    label "First"
+    show when second
+  }
+  field second: boolean {
+    label "Second"
+    show when first
+  }
+}

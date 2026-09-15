@@ -1,0 +1,6 @@
+form SelfDependency {
+  field consent: boolean {
+    label "Consent"
+    show when consent
+  }
+}

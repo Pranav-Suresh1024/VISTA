@@ -1,0 +1,10 @@
+form HiddenRequired {
+  field category: choice { general, reserved } {
+    label "Category"
+  }
+  field certificate: file {
+    label "Certificate"
+    show when category == reserved
+    required
+  }
+}

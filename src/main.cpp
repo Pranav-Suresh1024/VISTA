@@ -2,6 +2,7 @@
 #include <iostream>
 #include <string>
 
+#include "analysis.hpp"
 #include "ast.hpp"
 #include "diagnostic.hpp"
 #include "parser.hpp"
@@ -14,7 +15,7 @@ namespace {
 
 void print_help(std::ostream& output) {
     output << "VISTA - Validation and Interface Specification Translation Analyzer\n\n"
-           << "Usage: vista <source.vista> --emit <tokens|ast|symbols|diagnostics>\n"
+           << "Usage: vista <source.vista> --emit <tokens|ast|symbols|dependencies|graph|diagnostics>\n"
            << "       vista [option]\n\n"
            << "Options:\n"
            << "  --help       Show this help message\n"
@@ -22,7 +23,9 @@ void print_help(std::ostream& output) {
            << "  --emit tokens  Print the positioned Flex token stream\n"
            << "  --emit ast     Parse the source and print its abstract syntax tree\n"
            << "  --emit symbols Print the field symbol table\n"
-           << "  --emit diagnostics  Run semantic checks and print diagnostics\n";
+           << "  --emit dependencies  Print conditional field dependencies\n"
+           << "  --emit graph   Print the dependency graph in DOT format\n"
+           << "  --emit diagnostics  Run semantic and dependency analysis\n";
 }
 
 void print_tokens(const std::vector<vista::Token>& tokens) {
@@ -73,6 +76,7 @@ int main(int argc, char* argv[]) {
 
     const std::string emit_mode = argv[3];
     if (emit_mode != "tokens" && emit_mode != "ast" && emit_mode != "symbols" &&
+        emit_mode != "dependencies" && emit_mode != "graph" &&
         emit_mode != "diagnostics") {
         std::cerr << "VISTA: unknown emit mode '" << emit_mode << "'\n";
         return 2;
@@ -110,10 +114,25 @@ int main(int argc, char* argv[]) {
         for (const vista::Diagnostic& diagnostic : semantic_result.diagnostics) {
             std::cerr << vista::format_diagnostic(first_argument, diagnostic) << '\n';
         }
-        if (emit_mode == "diagnostics" && semantic_result.diagnostics.empty()) {
+        if (!semantic_result.succeeded() || emit_mode == "symbols") {
+            return semantic_result.succeeded() ? 0 : 1;
+        }
+
+        const vista::AnalysisResult analysis_result =
+            vista::analyze_dependencies(*parse_result.form, semantic_result);
+        if (emit_mode == "dependencies") {
+            std::cout << vista::format_dependencies(analysis_result);
+        } else if (emit_mode == "graph") {
+            std::cout << vista::format_dependency_graph_dot(
+                *parse_result.form, analysis_result);
+        }
+        for (const vista::Diagnostic& diagnostic : analysis_result.diagnostics) {
+            std::cerr << vista::format_diagnostic(first_argument, diagnostic) << '\n';
+        }
+        if (emit_mode == "diagnostics" && analysis_result.diagnostics.empty()) {
             std::cout << "No diagnostics.\n";
         }
-        return semantic_result.succeeded() ? 0 : 1;
+        return analysis_result.succeeded() ? 0 : 1;
     }
 
     return 0;
