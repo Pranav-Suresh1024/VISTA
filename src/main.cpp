@@ -1,8 +1,10 @@
-#include <iostream>
 #include <iomanip>
+#include <iostream>
 #include <string>
 
+#include "ast.hpp"
 #include "diagnostic.hpp"
+#include "parser.hpp"
 #include "scanner.hpp"
 #include "token.hpp"
 #include "version.hpp"
@@ -11,12 +13,13 @@ namespace {
 
 void print_help(std::ostream& output) {
     output << "VISTA - Validation and Interface Specification Translation Analyzer\n\n"
-           << "Usage: vista <source.vista> --emit tokens\n"
+           << "Usage: vista <source.vista> --emit <tokens|ast>\n"
            << "       vista [option]\n\n"
            << "Options:\n"
            << "  --help       Show this help message\n"
            << "  --version    Show the current VISTA version\n"
-           << "  --emit tokens  Print the positioned Flex token stream\n";
+           << "  --emit tokens  Print the positioned Flex token stream\n"
+           << "  --emit ast     Parse the source and print its abstract syntax tree\n";
 }
 
 void print_tokens(const std::vector<vista::Token>& tokens) {
@@ -53,8 +56,7 @@ int main(int argc, char* argv[]) {
         return 0;
     }
 
-    if (argc != 4 || std::string(argv[2]) != "--emit" ||
-        std::string(argv[3]) != "tokens") {
+    if (argc != 4 || std::string(argv[2]) != "--emit") {
         std::cerr << "VISTA: invalid command-line arguments\n"
                   << "Run 'vista --help' to see the available options.\n";
         return 2;
@@ -66,10 +68,32 @@ int main(int argc, char* argv[]) {
         return 2;
     }
 
-    print_tokens(result.tokens);
+    const std::string emit_mode = argv[3];
+    if (emit_mode != "tokens" && emit_mode != "ast") {
+        std::cerr << "VISTA: unknown emit mode '" << emit_mode << "'\n";
+        return 2;
+    }
+
+    if (emit_mode == "tokens") {
+        print_tokens(result.tokens);
+    }
     for (const vista::Diagnostic& diagnostic : result.diagnostics) {
         std::cerr << vista::format_diagnostic(first_argument, diagnostic) << '\n';
     }
+    if (!result.diagnostics.empty()) {
+        return 1;
+    }
 
-    return result.diagnostics.empty() ? 0 : 1;
+    if (emit_mode == "ast") {
+        const vista::ParseResult parse_result = vista::parse_tokens(result.tokens);
+        for (const vista::Diagnostic& diagnostic : parse_result.diagnostics) {
+            std::cerr << vista::format_diagnostic(first_argument, diagnostic) << '\n';
+        }
+        if (!parse_result.succeeded()) {
+            return 1;
+        }
+        std::cout << vista::format_ast(*parse_result.form);
+    }
+
+    return 0;
 }

@@ -1,0 +1,13 @@
+form RecoveryDemo {
+  field first text {
+    label "First field"
+  }
+
+  field valid: integer {
+    label "Valid field"
+  }
+
+  field second boolean {
+    label "Second field"
+  }
+}

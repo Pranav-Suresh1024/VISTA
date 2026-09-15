@@ -6,7 +6,7 @@ VISTA will read a small declarative form specification, validate its structure a
 
 ## Current status
 
-Stages 1 and 2 are complete. The project now has a repeatable WSL build and a Flex scanner that reads a `.vista` source file, recognizes its tokens, preserves line and column positions, and reports lexical errors.
+Stages 1 through 3 are complete. VISTA now has a repeatable WSL build, a positioned Flex scanner, and a Yacc-compatible Bison parser that constructs and prints a C++ abstract syntax tree.
 
 ## Requirements
 
@@ -34,6 +34,7 @@ The executable is created at `build/vista`.
 ./build/vista --version
 ./build/vista --help
 ./build/vista examples/valid_scholarship.vista --emit tokens
+./build/vista examples/valid_scholarship.vista --emit ast
 ```
 
 The token table contains each token's source location, classification, and original lexeme. Whitespace and `//` comments are ignored while their positions are still counted.
@@ -45,7 +46,7 @@ make test
 make demo
 ```
 
-`make test` runs the cumulative Stage 1 and Stage 2 checks. It covers valid tokenization, token positions, illegal characters, unterminated strings, missing input files, and command-line errors. `make demo` shows one valid scan and one lexical failure.
+`make test` runs all cumulative checks. Scanner tests cover token classes, positions, lexical failures, missing files, and command-line errors. Parser tests cover every field type, declarations, operator precedence, AST output, syntax diagnostics, and the rule that parsing stops after a lexical failure.
 
 ## Project layout
 
