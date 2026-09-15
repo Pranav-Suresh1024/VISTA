@@ -1,0 +1,10 @@
+* text=auto
+
+*.cpp text eol=lf
+*.hpp text eol=lf
+*.l text eol=lf
+*.y text eol=lf
+*.sh text eol=lf
+Makefile text eol=lf
+*.md text eol=lf
+*.ps1 text eol=crlf

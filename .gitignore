@@ -1,0 +1,18 @@
+# Build and generated output
+build/
+out/
+
+# Existing document artifacts are maintained outside the source repository
+*.docx
+*.pdf
+tmp/
+
+# Microsoft Word temporary files
+~$*
+~WRL*.tmp
+
+# Editor and operating-system files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
