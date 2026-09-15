@@ -41,6 +41,7 @@ The executable is created at `build/vista`.
 ./build/vista examples/type_mismatch.vista --emit diagnostics
 ./build/vista examples/hidden_required.vista --emit diagnostics
 ./build/vista examples/valid_scholarship.vista --emit html --out-dir out/scholarship
+./build/vista examples/valid_scholarship.vista --emit all --out-dir out/demo
 ```
 
 The token table contains each token's source location, classification, and original lexeme. Whitespace and `//` comments are ignored while their positions are still counted.
@@ -58,6 +59,10 @@ Witness analysis exhaustively checks finite Boolean and choice assignments. Nume
 
 HTML is generated only after every earlier compiler stage succeeds. The generated file contains accessible labels, native controls for all VISTA field types, embedded conditional behavior, escaped author-provided text, and check-message validation without external libraries.
 
+`--emit all` is the recommended demonstration command. It writes `tokens.txt`, `ast.txt`, `symbols.txt`, `dependencies.txt`, `graph.dot`, `diagnostics.txt`, and `form.html` into one output directory. Failed compilations write the intermediate results reached and `diagnostics.txt`, but never generate `form.html`.
+
+For the review walkthrough and current implementation evidence, see [DEMO_GUIDE.md](DEMO_GUIDE.md) and [docs/PHASE_2_PROGRESS.md](docs/PHASE_2_PROGRESS.md).
+
 ## Project layout
 
 ```text
@@ -73,5 +78,5 @@ README.md      Setup and current progress
 ## Exit codes
 
 - `0`: command completed successfully
-- `1`: the source contains a lexical, syntax, or semantic error
+- `1`: the source contains a lexical, syntax, semantic, or analysis error
 - `2`: invalid command-line usage
