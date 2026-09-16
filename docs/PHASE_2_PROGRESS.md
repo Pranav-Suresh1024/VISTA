@@ -28,8 +28,7 @@ VISTA 0.6.0 is a working Phase 2 prototype. It compiles a `.vista` form specific
 | Dependency analysis | Visibility and requirement edges, text table, DOT graph, self-dependencies, DFS cycle detection | `dependencies.txt`, `graph.dot`, `ANL001`, `ANL002` |
 | Witness analysis | Exhaustive Boolean/choice assignments and concrete hidden-required witnesses | `ANL003` |
 | Analysis boundary | Explicit refusal to overclaim unsupported numeric/date/text witness reasoning | `ANL900` |
-| HTML backend | All seven field types, presentation metadata, responsive styling, accessible labels/help/required feedback, conditional behavior, check messages, embedded CSS/JavaScript, output escaping | `form.html` |
-| Starter templates | Scholarship, train booking, and event registration examples are listed and compile through the same validated pipeline; custom `.vista` files remain supported | `--list-templates`, `--template`, `templates/README.md`, `make test` |
+| HTML backend | All seven field types, labels, native constraints, conditional behavior, check messages, embedded CSS/JavaScript, output escaping | `form.html` |
 | Integrated pipeline | One command produces all seven evidence files; failed compilation preserves progressive results and removes stale HTML | `--emit all`, `tests/test_pipeline.sh` |
 
 ## Output bundle
@@ -69,7 +68,6 @@ produces:
 - Boolean and choice hidden-required witnesses;
 - honest unsupported-analysis diagnostics;
 - HTML controls, conditional rules, validation messages, and output escaping;
-- scholarship, train-booking, and event-registration templates through the full output pipeline;
 - stale-output cleanup and the guarantee that failed compilations have no `form.html`;
 - command-line and missing-file exit codes.
 

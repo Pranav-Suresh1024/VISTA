@@ -35,7 +35,6 @@ test: $(TARGET)
 	@bash tests/test_semantic.sh
 	@bash tests/test_analysis.sh
 	@bash tests/test_codegen.sh
-	@bash tests/test_templates.sh
 	@bash tests/test_pipeline.sh
 
 demo: $(TARGET)

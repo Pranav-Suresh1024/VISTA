@@ -102,23 +102,12 @@ Open `out/demo/form.html` in a browser.
 1. Select `general`. The certificate field remains hidden.
 2. Select `reserved`. The certificate field appears and becomes required.
 3. Enter a name, choose `general`, and enter an age below 18.
-4. Select **Validate form**. The form explains that applicants must be at least 18 years old.
+4. Select **Validate form**. The check message appears.
 5. Enter age `18` or above, choose `reserved`, attach any local test file, and select **Validate form** again. The page reports that validation passed.
 
 Explain that the HTML, CSS, and restricted validation JavaScript are embedded in one file and use no external framework.
 
-## 6. Show the starter-template catalog
-
-List and compile a template:
-
-```bash
-./build/vista --list-templates
-./build/vista --template train-booking --emit all --out-dir out/train-booking
-```
-
-Open `out/train-booking/form.html`. Enter the same city for **From** and **To** to show the validation message, then choose two different cities and validate again. Point out that this is a sample form only—it does not check live routes, fares, or reservations. The scholarship and event-registration templates demonstrate other domain-specific fields and conditional behavior. A custom `.vista` file can still be compiled by passing its path directly.
-
-## 7. Demonstrate the novelty feature
+## 6. Demonstrate the novelty feature
 
 ```bash
 ./build/vista examples/hidden_required.vista \
@@ -141,7 +130,7 @@ cat out/hidden-required/diagnostics.txt
 
 Point out that `form.html` is absent. VISTA fails closed and gives a concrete assignment that reproduces the problem.
 
-## 8. Briefly show other error levels
+## 7. Briefly show other error levels
 
 ```bash
 ./build/vista examples/lexical_error.vista --emit diagnostics
