@@ -18,8 +18,9 @@ form ScholarshipApplication {
 
   field age: integer {
     label "Age"
+    required
   }
 
   check name != "" message "Enter your full name"
-  check age >= 18 and category != general message "Review the application"
+  check age >= 18 and (category == general or category == reserved) message "Applicants must be at least 18 years old"
 }

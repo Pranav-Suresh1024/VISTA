@@ -27,8 +27,8 @@ expect_contains "$valid_output" "Form ScholarshipApplication @2:1" "form AST nod
 expect_contains "$valid_output" "Field name : text @3:3" "text field AST node"
 expect_contains "$valid_output" "Field category : choice [general, reserved] @8:3" "choice AST node"
 expect_contains "$valid_output" "ShowWhen @15:5" "conditional visibility node"
-expect_contains "$valid_output" "Binary and @24:9" "operator precedence tree"
-expect_contains "$valid_output" 'Message "Review the application"' "check message"
+expect_contains "$valid_output" "Binary and @25:9" "operator precedence tree"
+expect_contains "$valid_output" 'Message "Applicants must be at least 18 years old"' "check message"
 
 catalogue_output="$($binary examples/all_tokens.vista --emit ast 2>&1)"
 catalogue_status=$?
