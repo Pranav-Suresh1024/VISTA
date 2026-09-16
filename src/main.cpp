@@ -14,6 +14,7 @@
 #include "scanner.hpp"
 #include "semantic.hpp"
 #include "token.hpp"
+#include "validation.hpp"
 #include "version.hpp"
 
 namespace {
@@ -22,6 +23,7 @@ void print_help(std::ostream& output) {
     output << "VISTA - Validation and Interface Specification Translation Analyzer\n\n"
            << "Usage: vista <source.vista> --emit <tokens|ast|symbols|dependencies|graph|diagnostics>\n"
            << "       vista <source.vista> --emit <html|all> --out-dir <directory>\n"
+           << "       vista <source.vista> --validate-data <values.data>\n"
            << "       vista --list-templates\n"
            << "       vista [option]\n\n"
            << "Options:\n"
@@ -35,7 +37,8 @@ void print_help(std::ostream& output) {
            << "  --emit graph   Print the dependency graph in DOT format\n"
            << "  --emit diagnostics  Run semantic and dependency analysis\n"
            << "  --emit html --out-dir DIR  Generate a standalone HTML form\n"
-           << "  --emit all --out-dir DIR   Write every demonstration artifact\n";
+           << "  --emit all --out-dir DIR   Write every demonstration artifact\n"
+           << "  --validate-data FILE  Validate supplied field values in the CLI\n";
 }
 
 struct StarterTemplate {
@@ -61,7 +64,7 @@ void print_templates(std::ostream& output) {
                << "    Compile: ./build/vista " << form_template.source_path
                << " --emit all --out-dir " << form_template.output_directory << "\n";
     }
-    output << "These examples validate in the browser only; they do not submit or store forms.\n";
+    output << "These examples support local CLI and browser validation; they do not submit or store forms.\n";
 }
 
 std::string format_tokens(const std::vector<vista::Token>& tokens) {
@@ -180,10 +183,18 @@ int main(int argc, char* argv[]) {
 
     const std::string source_path = argv[1];
     if (source_path == "--help") {
+        if (argc != 2) {
+            std::cerr << "VISTA: --help does not accept additional arguments\n";
+            return 2;
+        }
         print_help(std::cout);
         return 0;
     }
     if (source_path == "--version") {
+        if (argc != 2) {
+            std::cerr << "VISTA: --version does not accept additional arguments\n";
+            return 2;
+        }
         std::cout << vista::kProgramName << ' ' << vista::kVersion << '\n';
         return 0;
     }
@@ -196,26 +207,29 @@ int main(int argc, char* argv[]) {
         return 0;
     }
 
-    if ((argc != 4 && argc != 6) || std::string(argv[2]) != "--emit") {
+    const bool validation_mode =
+        argc == 4 && std::string(argv[2]) == "--validate-data";
+    if (!validation_mode &&
+        ((argc != 4 && argc != 6) || std::string(argv[2]) != "--emit")) {
         std::cerr << "VISTA: invalid command-line arguments\n"
                   << "Run 'vista --help' to see the available options.\n";
         return 2;
     }
 
-    const std::string emit_mode = argv[3];
+    const std::string emit_mode = validation_mode ? "" : argv[3];
     const bool directory_mode = emit_mode == "html" || emit_mode == "all";
     const bool known_mode =
         emit_mode == "tokens" || emit_mode == "ast" || emit_mode == "symbols" ||
         emit_mode == "dependencies" || emit_mode == "graph" ||
         emit_mode == "diagnostics" || directory_mode;
-    if (!known_mode) {
+    if (!validation_mode && !known_mode) {
         std::cerr << "VISTA: unknown emit mode '" << emit_mode << "'\n";
         return 2;
     }
-    if ((directory_mode &&
-         (argc != 6 || std::string(argv[4]) != "--out-dir" ||
-          std::string(argv[5]).empty())) ||
-        (!directory_mode && argc != 4)) {
+    if (!validation_mode && ((directory_mode &&
+          (argc != 6 || std::string(argv[4]) != "--out-dir" ||
+           std::string(argv[5]).empty())) ||
+        (!directory_mode && argc != 4))) {
         std::cerr << "VISTA: invalid command-line arguments\n"
                   << "Run 'vista --help' to see the available options.\n";
         return 2;
@@ -319,6 +333,16 @@ int main(int argc, char* argv[]) {
     }
     if (emit_mode == "dependencies" || emit_mode == "graph") {
         return 0;
+    }
+
+    if (validation_mode) {
+        const vista::ValidationResult validation =
+            vista::validate_data_file(*parse_result.form, semantic_result, argv[3]);
+        std::cout << vista::format_validation_report(validation);
+        if (!validation.data_opened) {
+            return 2;
+        }
+        return validation.succeeded() ? 0 : 1;
     }
 
     if (emit_mode == "diagnostics") {

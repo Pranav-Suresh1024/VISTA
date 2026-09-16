@@ -6,6 +6,8 @@ form CollegeAdmission {
     label "Full legal name"
     section "Applicant details"
     placeholder "Name on official documents"
+    min_length 3
+    max_length 100
     required
   }
 
@@ -26,6 +28,7 @@ form CollegeAdmission {
   field date_of_birth: date {
     label "Date of birth"
     section "Applicant details"
+    maximum "2010-12-31"
     required
   }
 
@@ -70,6 +73,8 @@ form CollegeAdmission {
     label "Program name"
     section "Program selection"
     placeholder "Enter the program you are interested in"
+    min_length 2
+    max_length 100
     show when program == other
     required when program == other
   }
@@ -79,6 +84,14 @@ form CollegeAdmission {
     section "Documents and declaration"
     help "Select a local sample file to demonstrate the document control."
     required
+  }
+
+  field lateral_entry_document: file {
+    label "Diploma or lateral-entry document"
+    section "Documents and declaration"
+    help "Required when diploma is selected as the completed qualification."
+    show when qualification == diploma
+    required when qualification == diploma
   }
 
   field applicant_statement: textarea {
@@ -96,5 +109,6 @@ form CollegeAdmission {
   }
 
   check previous_score >= 0 and previous_score <= 100 message "Final score must be between 0 and 100"
+  check previous_score >= 50 message "This demonstration requires a final score of at least 50"
   check declaration == true message "Confirm the declaration before continuing"
 }

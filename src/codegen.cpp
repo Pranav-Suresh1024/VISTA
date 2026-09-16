@@ -96,6 +96,30 @@ std::vector<const Expression*> conditions_for(const FieldDecl& field,
     return conditions;
 }
 
+void collect_field_references(const Expression* expression,
+                              const SemanticResult& semantics,
+                              std::vector<std::string>& references) {
+    if (expression == nullptr) {
+        return;
+    }
+    const auto information = semantics.expressions.find(expression);
+    const bool choice_literal = information != semantics.expressions.end() &&
+                                information->second.choice_literal;
+    if (expression->kind == ExpressionKind::Name &&
+        !choice_literal &&
+        semantics.symbols.find(expression->value) != nullptr) {
+        bool already_present = false;
+        for (const std::string& reference : references) {
+            already_present = already_present || reference == expression->value;
+        }
+        if (!already_present) {
+            references.push_back(expression->value);
+        }
+    }
+    collect_field_references(expression->left, semantics, references);
+    collect_field_references(expression->right, semantics, references);
+}
+
 std::string expression_javascript(const Expression* expression,
                                   const SemanticResult& semantics) {
     switch (expression->kind) {
@@ -217,7 +241,8 @@ void generate_field(std::ostringstream& output,
                << "\" data-type=\"" << field_type_name(field.type) << "\""
                << (has_help ? " aria-describedby=\"help-" + field.name + "\"" : "");
         if (field.type == FieldType::Phone) {
-            output << " inputmode=\"tel\" autocomplete=\"tel\"";
+            output << " inputmode=\"tel\" autocomplete=\"tel\""
+                   << " pattern=\"[+() 0-9-]{7,25}\"";
         } else if (field.type == FieldType::Email) {
             output << " autocomplete=\"email\"";
         }
@@ -236,6 +261,16 @@ void generate_field(std::ostringstream& output,
         }
         if (maximum != nullptr) {
             output << " max=\"" << *maximum << "\"";
+        }
+        const std::string* minimum_length =
+            constraint_value(field, PropertyKind::MinLength);
+        const std::string* maximum_length =
+            constraint_value(field, PropertyKind::MaxLength);
+        if (minimum_length != nullptr) {
+            output << " minlength=\"" << *minimum_length << "\"";
+        }
+        if (maximum_length != nullptr) {
+            output << " maxlength=\"" << *maximum_length << "\"";
         }
         if (is_always_required(field)) {
             output << " required";
@@ -389,7 +424,17 @@ std::string generate_html(const FormAst& form,
             output << ",\n";
         }
         first_check = false;
-        output << "      { valid: () => "
+        std::vector<std::string> references;
+        collect_field_references(
+            declaration->check->condition, semantics, references);
+        output << "      { references: [";
+        for (std::size_t index = 0; index < references.size(); ++index) {
+            if (index != 0) {
+                output << ", ";
+            }
+            output << javascript_string(references[index]);
+        }
+        output << "], valid: () => "
                << expression_javascript(declaration->check->condition, semantics)
                << ", message: " << javascript_string(declaration->check->message) << " }";
     }
@@ -413,7 +458,9 @@ std::string generate_html(const FormAst& form,
            << "    form.addEventListener('submit', (event) => {\n"
            << "      event.preventDefault();\n"
            << "      updateForm();\n"
-           << "      const errors = checks.filter((check) => !check.valid()).map((check) => check.message);\n"
+           << "      const errors = checks.filter((check) =>\n"
+           << "        check.references.every((name) => !document.getElementById(name).disabled) &&\n"
+           << "        !check.valid()).map((check) => check.message);\n"
            << "      const list = document.getElementById('validation-errors');\n"
            << "      const status = document.getElementById('status');\n"
            << "      list.replaceChildren();\n"

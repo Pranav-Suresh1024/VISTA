@@ -6,7 +6,7 @@ output_dir="build/test-phase2-scholarship"
 failures=0
 
 if ! "$binary" templates/scholarship_application.vista --emit all --out-dir "$output_dir"; then
-    echo "FAIL: Scholarship Phase 2 template did not compile"
+    echo "FAIL: Scholarship template did not compile"
     exit 1
 fi
 
@@ -30,6 +30,8 @@ expect_contains() {
 
 expect_contains "$output_dir/diagnostics.txt" "No diagnostics." "clean end-to-end diagnostics"
 expect_contains "$output_dir/form.html" 'type="email" data-type="email"' "scholarship email field"
+expect_contains "$output_dir/form.html" 'id="full_name" name="full_name" type="text" data-type="text"' "scholarship name field"
+expect_contains "$output_dir/form.html" 'minlength="3" maxlength="100"' "normal text length checks"
 expect_contains "$output_dir/form.html" 'type="tel" data-type="phone"' "scholarship phone field"
 expect_contains "$output_dir/form.html" '<textarea id="personal_statement"' "scholarship statement textarea"
 expect_contains "$output_dir/form.html" 'minlength="50" maxlength="1000"' "personal statement length checks"
@@ -43,8 +45,8 @@ expect_contains "$output_dir/form.html" 'message: "GPA must be between 0 and 10"
 expect_contains "$output_dir/form.html" 'message: "Confirm the declaration before continuing"' "helpful declaration validation message"
 
 if [[ $failures -ne 0 ]]; then
-    echo "$failures Phase 2 scholarship test(s) failed."
+    echo "$failures Scholarship template test(s) failed."
     exit 1
 fi
 
-echo "Phase 2 scholarship end-to-end tests passed."
+echo "Scholarship template end-to-end tests passed."

@@ -1,0 +1,12 @@
+applicant_name = "A"
+email_address = aditi.example.com
+phone_number = 123
+date_of_birth = 2015-04-20
+previous_institution = "Sunbeam Junior College"
+qualification = diploma
+graduation_year = 1999
+previous_score = 42
+program = other
+transcript = transcript.pdf
+applicant_statement = "Too short"
+declaration = false

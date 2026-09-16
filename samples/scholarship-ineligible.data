@@ -1,0 +1,15 @@
+# Structurally valid values that fail the demonstration eligibility checks
+full_name = "Maya Patel"
+email_address = maya.patel@example.com
+phone_number = "+91 98765 43210"
+date_of_birth = 2005-08-15
+institution = "VIT Chennai"
+course = engineering
+study_year = third
+gpa = 5.5
+household_income = 900000
+applicant_category = general
+personal_statement = "I want to complete my engineering degree and use my skills to build practical solutions that help my community."
+enrollment_proof = enrollment.pdf
+income_proof = income.pdf
+declaration = true

@@ -6,6 +6,8 @@ form EventRegistration {
     label "Attendee name"
     section "Attendee details"
     placeholder "Full name"
+    min_length 2
+    max_length 100
     required
   }
 
@@ -45,6 +47,20 @@ form EventRegistration {
     required
   }
 
+  field bringing_guest: boolean {
+    label "I am bringing a guest."
+    section "Registration choices"
+  }
+
+  field guest_name: text {
+    label "Guest name"
+    section "Registration choices"
+    min_length 2
+    max_length 100
+    show when bringing_guest
+    required when bringing_guest
+  }
+
   field workshop_track: choice { web_development, data_science, career_planning } {
     label "Workshop track"
     section "Optional details"
@@ -60,6 +76,14 @@ form EventRegistration {
     placeholder "Optional"
     max_length 300
     show when attendance_mode == in_person
+  }
+
+  field online_timezone: choice { ist, utc, cet, est, pst } {
+    label "Preferred timezone"
+    section "Optional details"
+    help "Required for online attendance so a suitable session can be shown."
+    show when attendance_mode == online
+    required when attendance_mode == online
   }
 
   field accessibility_support: boolean {

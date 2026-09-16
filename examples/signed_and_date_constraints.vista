@@ -1,0 +1,14 @@
+form SignedAndDateConstraints {
+  field balance: decimal {
+    label "Balance"
+    minimum -100.5
+    maximum 100.5
+  }
+  field appointment: date {
+    label "Appointment"
+    minimum "2026-01-01"
+    maximum "2026-12-31"
+  }
+  check balance >= -100.5 message "Balance is below the supported range"
+  check appointment <= "2026-12-31" message "Appointment must be in 2026"
+}

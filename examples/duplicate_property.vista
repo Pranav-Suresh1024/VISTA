@@ -1,0 +1,6 @@
+form DuplicateProperty {
+  field name: text {
+    label "Name"
+    label "Second name"
+  }
+}

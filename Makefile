@@ -9,8 +9,8 @@ TARGET := build/vista
 GENERATED_SCANNER := build/vista_lexer.cpp
 GENERATED_PARSER := build/vista_parser.cpp
 GENERATED_PARSER_HEADER := build/vista_parser.hpp
-SOURCES := src/main.cpp src/analysis.cpp src/ast.cpp src/codegen.cpp src/diagnostic.cpp src/parser.cpp src/semantic.cpp src/token.cpp
-HEADERS := include/analysis.hpp include/ast.hpp include/codegen.hpp include/diagnostic.hpp include/parser.hpp include/scanner.hpp include/semantic.hpp include/token.hpp include/version.hpp
+SOURCES := src/main.cpp src/analysis.cpp src/ast.cpp src/codegen.cpp src/diagnostic.cpp src/parser.cpp src/semantic.cpp src/token.cpp src/validation.cpp
+HEADERS := include/analysis.hpp include/ast.hpp include/codegen.hpp include/diagnostic.hpp include/parser.hpp include/scanner.hpp include/semantic.hpp include/token.hpp include/validation.hpp include/version.hpp
 
 .PHONY: all test demo clean
 
@@ -37,19 +37,19 @@ test: $(TARGET)
 	@bash tests/test_codegen.sh
 	@bash tests/test_phase2.sh
 	@bash tests/test_templates.sh
+	@bash tests/test_validation.sh
 	@bash tests/test_pipeline.sh
 
 demo: $(TARGET)
-	@echo "VISTA public-service template catalogue demonstration"
+	@echo "VISTA backend-only compiler and data-validation demonstration"
 	@echo
 	@./$(TARGET) --version
 	@echo
 	@./$(TARGET) --list-templates
 	@echo
-	@./$(TARGET) templates/scholarship_application.vista --emit all --out-dir out/phase3-templates/scholarship
-	@./$(TARGET) templates/college_admission.vista --emit all --out-dir out/phase3-templates/college-admission
-	@./$(TARGET) templates/event_registration.vista --emit all --out-dir out/phase3-templates/event-registration
-	@echo "Open each out/phase3-templates/*/form.html in a browser."
+	@./$(TARGET) templates/scholarship_application.vista --emit diagnostics
+	@./$(TARGET) templates/scholarship_application.vista --validate-data samples/scholarship-valid.data
+	@./$(TARGET) templates/scholarship_application.vista --validate-data samples/scholarship-invalid.data || true
 	@echo
 	@./$(TARGET) examples/hidden_required.vista --emit diagnostics || true
 

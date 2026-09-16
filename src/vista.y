@@ -160,9 +160,25 @@ declaration_list:
   | declaration_list IDENTIFIER STRING_LITERAL
     {
         if (*$2 == "title") {
-            context.form_title = *$3;
+            if (context.has_form_title) {
+                context.result.diagnostics.push_back(
+                    {"SYN002", "form title is declared more than once",
+                     static_cast<std::size_t>(@2.first_line),
+                     static_cast<std::size_t>(@2.first_column)});
+            } else {
+                context.form_title = *$3;
+                context.has_form_title = true;
+            }
         } else if (*$2 == "description") {
-            context.form_description = *$3;
+            if (context.has_form_description) {
+                context.result.diagnostics.push_back(
+                    {"SYN002", "form description is declared more than once",
+                     static_cast<std::size_t>(@2.first_line),
+                     static_cast<std::size_t>(@2.first_column)});
+            } else {
+                context.form_description = *$3;
+                context.has_form_description = true;
+            }
         } else {
             delete $2;
             delete $3;
@@ -292,6 +308,10 @@ field_property:
             kind = vista::PropertyKind::Help;
         } else if (*$1 == "placeholder") {
             kind = vista::PropertyKind::Placeholder;
+        } else if (*$1 == "minimum") {
+            kind = vista::PropertyKind::Minimum;
+        } else if (*$1 == "maximum") {
+            kind = vista::PropertyKind::Maximum;
         } else {
             delete $1;
             delete $2;

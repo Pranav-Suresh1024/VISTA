@@ -35,6 +35,7 @@ expect_contains "$valid_dir/form.html" '<option value="reserved">reserved</optio
 expect_contains "$valid_dir/form.html" 'visible: () => ((readValue("category") === "reserved"))' "visibility rule"
 expect_contains "$valid_dir/form.html" 'required: () => ((readValue("category") === "reserved"))' "conditional required rule"
 expect_contains "$valid_dir/form.html" 'message: "Enter your full name"' "validation message"
+expect_contains "$valid_dir/form.html" 'references: ["name"]' "visibility-aware check references"
 expect_contains "$valid_dir/form.html" '<title>ScholarshipApplication</title>' "legacy form-name title fallback"
 expect_contains "$valid_dir/form.html" 'role="status" aria-live="polite"' "accessible validation status"
 expect_contains "$valid_dir/form.html" 'class="required-indicator"' "required indicator support"
@@ -87,6 +88,17 @@ expect_contains "$typed_dir/form.html" 'type="tel" data-type="phone"' "phone con
 expect_contains "$typed_dir/form.html" 'inputmode="tel" autocomplete="tel"' "phone keyboard hint"
 expect_contains "$typed_dir/form.html" '<textarea id="textarea" name="textarea" data-type="textarea" rows="6" minlength="5" maxlength="200"></textarea>' "textarea length constraints"
 expect_contains "$typed_dir/form.html" 'min="0" max="4.0"' "numeric min/max constraints"
+expect_contains "$typed_dir/form.html" 'pattern="[+() 0-9-]{7,25}"' "phone format constraint"
+
+signed_date_dir="$output_root/signed-date"
+$binary examples/signed_and_date_constraints.vista --emit html --out-dir "$signed_date_dir" >/dev/null 2>&1
+signed_date_status=$?
+if [[ $signed_date_status -ne 0 ]]; then
+    echo "FAIL: signed/date HTML generation returned $signed_date_status"
+    failures=$((failures + 1))
+fi
+expect_contains "$signed_date_dir/form.html" 'min="-100.5" max="100.5"' "signed numeric bounds"
+expect_contains "$signed_date_dir/form.html" 'min="2026-01-01" max="2026-12-31"' "date bounds"
 
 escaping_dir="$output_root/escaping"
 $binary examples/safe_escaping.vista --emit html --out-dir "$escaping_dir" >/dev/null 2>&1

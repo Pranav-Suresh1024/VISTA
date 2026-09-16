@@ -1,0 +1,7 @@
+form DuplicateFormTitle {
+  title "First title"
+  title "Second title"
+  field name: text {
+    label "Name"
+  }
+}

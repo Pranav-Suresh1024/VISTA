@@ -44,6 +44,22 @@ if [[ $typed_status -ne 0 ]]; then
     failures=$((failures + 1))
 fi
 
+extended_output="$($binary examples/signed_and_date_constraints.vista --emit diagnostics 2>&1)"
+extended_status=$?
+if [[ $extended_status -ne 0 ]]; then
+    echo "FAIL: signed numeric and date constraints returned $extended_status"
+    echo "$extended_output"
+    failures=$((failures + 1))
+fi
+
+collision_output="$($binary examples/choice_field_collision.vista --emit diagnostics 2>&1)"
+collision_status=$?
+if [[ $collision_status -ne 0 ]]; then
+    echo "FAIL: choice option and field-name collision returned $collision_status"
+    echo "$collision_output"
+    failures=$((failures + 1))
+fi
+
 check_failure() {
     local file="$1"
     local code="$2"
@@ -66,13 +82,16 @@ check_failure examples/type_mismatch.vista SEM003 "cannot compare integer and te
 check_failure examples/invalid_choice.vista SEM005 "is not an option of choice field 'category'"
 check_failure examples/missing_label.vista SEM006 "requires a nonempty label"
 check_failure examples/non_boolean_condition.vista SEM004 "visibility condition must be boolean"
-check_failure examples/invalid_numeric_constraint_type.vista SEM007 "require an integer or decimal field"
+check_failure examples/invalid_numeric_constraint_type.vista SEM007 "require an integer, decimal, or date field"
 check_failure examples/inverted_numeric_constraints.vista SEM008 "minimum value must not exceed maximum value"
-check_failure examples/invalid_length_constraint_type.vista SEM009 "length constraints require a textarea field"
+check_failure examples/invalid_length_constraint_type.vista SEM009 "length constraints require a text, email, phone, or textarea field"
 check_failure examples/inverted_length_constraints.vista SEM011 "minimum length must not exceed maximum length"
 check_failure examples/decimal_integer_bound.vista SEM013 "integer field bounds must use whole-number values"
 check_failure examples/duplicate_numeric_constraint.vista SEM012 "declares the same constraint more than once"
 check_failure examples/decimal_text_length.vista SEM010 "length constraints must be whole numbers"
+check_failure examples/duplicate_choice_option.vista SEM014 "repeats option 'general'"
+check_failure examples/duplicate_property.vista SEM015 "declares 'label' more than once"
+check_failure examples/empty_form.vista SEM016 "form must declare at least one field"
 
 if [[ $failures -ne 0 ]]; then
     echo "$failures Stage 4 test(s) failed."

@@ -1,12 +1,14 @@
 form ScholarshipApplication {
   title "Scholarship Application"
-  description "Complete the sections below to prepare a scholarship application. This prototype validates your entries in this browser only; it does not submit or store them."
+  description "Complete the sections below to prepare a scholarship application. This prototype validates locally; it does not submit or store entries."
 
   field full_name: text {
     label "Full legal name"
     section "Personal and contact details"
     help "Use the name shown on your official documents."
     placeholder "e.g. Maya Patel"
+    min_length 3
+    max_length 100
     required
   }
 
@@ -15,6 +17,7 @@ form ScholarshipApplication {
     section "Personal and contact details"
     help "We use this only to demonstrate email-format validation."
     placeholder "you@example.com"
+    max_length 120
     required
   }
 
@@ -28,6 +31,8 @@ form ScholarshipApplication {
   field date_of_birth: date {
     label "Date of birth"
     section "Personal and contact details"
+    maximum "2008-12-31"
+    help "For this demonstration, applicants must be born on or before 31 December 2008."
     required
   }
 
@@ -43,6 +48,16 @@ form ScholarshipApplication {
     section "Institution and course"
     placeholder "Choose an area of study"
     required
+  }
+
+  field other_course: text {
+    label "Course or area name"
+    section "Institution and course"
+    placeholder "Enter your course or area of study"
+    min_length 2
+    max_length 100
+    show when course == other
+    required when course == other
   }
 
   field study_year: choice { first, second, third, fourth, postgraduate } {
@@ -102,6 +117,14 @@ form ScholarshipApplication {
     required
   }
 
+  field previous_degree_proof: file {
+    label "Previous degree proof"
+    section "Supporting documents"
+    help "Required only for postgraduate applicants."
+    show when study_year == postgraduate
+    required when study_year == postgraduate
+  }
+
   field category_certificate: file {
     label "Category certificate"
     section "Supporting documents"
@@ -117,7 +140,10 @@ form ScholarshipApplication {
   }
 
   check full_name != "" message "Enter your full legal name"
+  check other_course != "" message "Enter the course name when Other is selected"
   check gpa >= 0 and gpa <= 10 message "GPA must be between 0 and 10"
   check household_income >= 0 message "Household income cannot be negative"
+  check gpa >= 6.0 message "This demonstration requires a GPA of at least 6.0"
+  check household_income <= 800000 message "This demonstration requires household income of 800000 or less"
   check declaration == true message "Confirm the declaration before continuing"
 }

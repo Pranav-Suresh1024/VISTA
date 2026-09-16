@@ -1,6 +1,6 @@
 form InvalidLengthConstraintType {
-  field email: email {
-    label "Email"
+  field count: integer {
+    label "Count"
     max_length 120
   }
 }

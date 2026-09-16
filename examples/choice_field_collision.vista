@@ -1,0 +1,14 @@
+form ChoiceFieldCollision {
+  field other: text {
+    label "Other details"
+  }
+  field program: choice { science, other } {
+    label "Program"
+  }
+  field program_details: text {
+    label "Program details"
+    show when program == other
+    required when program == other
+  }
+  check program == other message "The choice literal must win over the field name"
+}

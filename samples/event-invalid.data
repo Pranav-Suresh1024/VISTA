@@ -1,0 +1,9 @@
+attendee_name = "S"
+email_address = sam.example.com
+phone_number = invalid
+event = workshop
+attendance_mode = online
+attendee_count = 5
+bringing_guest = true
+accessibility_support = false
+declaration = false

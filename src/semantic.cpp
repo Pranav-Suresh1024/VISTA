@@ -5,6 +5,7 @@
 #include <iomanip>
 #include <sstream>
 #include <string_view>
+#include <unordered_set>
 #include <utility>
 
 #include "token.hpp"
@@ -104,12 +105,64 @@ bool parse_length(const std::string& text, unsigned long long& value) {
     }
 }
 
+bool is_leap_year(int year) {
+    return year % 400 == 0 || (year % 4 == 0 && year % 100 != 0);
+}
+
+bool valid_iso_date(const std::string& text) {
+    if (text.size() != 10 || text[4] != '-' || text[7] != '-') {
+        return false;
+    }
+    for (std::size_t index = 0; index < text.size(); ++index) {
+        if (index == 4 || index == 7) {
+            continue;
+        }
+        if (text[index] < '0' || text[index] > '9') {
+            return false;
+        }
+    }
+    const int year = std::stoi(text.substr(0, 4));
+    const int month = std::stoi(text.substr(5, 2));
+    const int day = std::stoi(text.substr(8, 2));
+    if (year == 0 || month < 1 || month > 12) {
+        return false;
+    }
+    static const int days_per_month[] = {
+        31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31
+    };
+    int maximum_day = days_per_month[month - 1];
+    if (month == 2 && is_leap_year(year)) {
+        maximum_day = 29;
+    }
+    return day >= 1 && day <= maximum_day;
+}
+
+bool is_textual_field(FieldType type) {
+    return type == FieldType::Text || type == FieldType::Email ||
+           type == FieldType::Phone || type == FieldType::Textarea;
+}
+
+std::string property_name(PropertyKind kind) {
+    switch (kind) {
+        case PropertyKind::Label: return "label";
+        case PropertyKind::Section: return "section";
+        case PropertyKind::Help: return "help";
+        case PropertyKind::Placeholder: return "placeholder";
+        case PropertyKind::Required: return "required";
+        default: return "";
+    }
+}
+
 class SemanticAnalyzer {
 public:
     explicit SemanticAnalyzer(const FormAst& source_form) : form(source_form) {}
 
     SemanticResult run() {
         collect_symbols();
+        if (result.symbols.entries().empty()) {
+            add_diagnostic(
+                result, "SEM016", "form must declare at least one field", form.span);
+        }
         validate_declarations();
         return std::move(result);
     }
@@ -167,7 +220,30 @@ private:
                 field.span);
         }
 
+        std::unordered_set<std::string> options;
+        for (const std::string& option : field.options) {
+            if (!options.insert(option).second) {
+                add_diagnostic(
+                    result,
+                    "SEM014",
+                    "choice field '" + field.name + "' repeats option '" + option + "'",
+                    field.span);
+            }
+        }
+
+        std::unordered_set<int> singleton_properties;
+
         for (const FieldProperty* property : field.properties) {
+            const std::string singleton_name = property_name(property->kind);
+            if (!singleton_name.empty() &&
+                !singleton_properties.insert(static_cast<int>(property->kind)).second) {
+                add_diagnostic(
+                    result,
+                    "SEM015",
+                    "field '" + field.name + "' declares '" + singleton_name +
+                        "' more than once",
+                    property->span);
+            }
             if (property->kind == PropertyKind::RequiredWhen) {
                 validate_condition(property->condition, "required condition");
             } else if (property->kind == PropertyKind::ShowWhen) {
@@ -199,13 +275,35 @@ private:
         const bool has_length_limit = limits[2] != nullptr || limits[3] != nullptr;
         const bool numeric_field = field.type == FieldType::Integer ||
                                    field.type == FieldType::Decimal;
-        if (has_numeric_limit && !numeric_field) {
+        const bool date_field = field.type == FieldType::Date;
+        if (has_numeric_limit && !numeric_field && !date_field) {
             const FieldProperty* property = limits[0] != nullptr ? limits[0] : limits[1];
             add_diagnostic(
                 result,
                 "SEM007",
-                "minimum and maximum constraints require an integer or decimal field",
+                "minimum and maximum constraints require an integer, decimal, or date field",
                 property->span);
+        } else if (has_numeric_limit && date_field) {
+            const bool minimum_is_valid =
+                limits[0] == nullptr || valid_iso_date(limits[0]->text);
+            const bool maximum_is_valid =
+                limits[1] == nullptr || valid_iso_date(limits[1]->text);
+            if (!minimum_is_valid || !maximum_is_valid) {
+                const FieldProperty* property =
+                    limits[0] != nullptr && !minimum_is_valid ? limits[0] : limits[1];
+                add_diagnostic(
+                    result,
+                    "SEM017",
+                    "date constraints must use valid YYYY-MM-DD values",
+                    property->span);
+            } else if (limits[0] != nullptr && limits[1] != nullptr &&
+                       limits[0]->text > limits[1]->text) {
+                add_diagnostic(
+                    result,
+                    "SEM008",
+                    "minimum date must not exceed maximum date",
+                    limits[1]->span);
+            }
         } else if (has_numeric_limit) {
             long double minimum = 0.0L;
             long double maximum = 0.0L;
@@ -216,10 +314,10 @@ private:
             if (!minimum_is_valid || !maximum_is_valid) {
                 add_diagnostic(result, "SEM008", "numeric constraints must be finite values", field.span);
             } else if (field.type == FieldType::Integer &&
-                       ((limits[0] != nullptr && limits[0]->text.find('.') != std::string::npos) ||
-                        (limits[1] != nullptr && limits[1]->text.find('.') != std::string::npos))) {
+                       ((limits[0] != nullptr && std::floor(minimum) != minimum) ||
+                        (limits[1] != nullptr && std::floor(maximum) != maximum))) {
                 const FieldProperty* property =
-                    limits[0] != nullptr && limits[0]->text.find('.') != std::string::npos
+                    limits[0] != nullptr && std::floor(minimum) != minimum
                         ? limits[0]
                         : limits[1];
                 add_diagnostic(
@@ -235,12 +333,12 @@ private:
         if (!has_length_limit) {
             return;
         }
-        if (field.type != FieldType::Textarea) {
+        if (!is_textual_field(field.type)) {
             const FieldProperty* property = limits[2] != nullptr ? limits[2] : limits[3];
             add_diagnostic(
                 result,
                 "SEM009",
-                "length constraints require a textarea field",
+                "length constraints require a text, email, phone, or textarea field",
                 property->span);
             return;
         }
@@ -327,12 +425,64 @@ private:
         ExpressionInfo right_info;
 
         if (left_symbol != nullptr && left_symbol->type == FieldType::Choice &&
-            right->kind == ExpressionKind::Name && right_symbol == nullptr) {
+            (right->kind == ExpressionKind::Name ||
+             right->kind == ExpressionKind::StringLiteral) &&
+            contains_option(*left_symbol, right->value)) {
+            left_info = analyze_name(left);
+            right_info = remember(right, {ValueType::Choice, left_symbol->name, true});
+        } else if (left_symbol != nullptr && left_symbol->type == FieldType::Choice &&
+                   right->kind == ExpressionKind::Name && right_symbol == nullptr) {
             left_info = analyze_name(left);
             right_info = analyze_name(right, left_symbol);
+        } else if (left_symbol != nullptr && left_symbol->type == FieldType::Choice &&
+                   right->kind == ExpressionKind::StringLiteral) {
+            left_info = analyze_name(left);
+            add_diagnostic(
+                result,
+                "SEM005",
+                "'" + right->value + "' is not an option of choice field '" +
+                    left_symbol->name + "'",
+                right->span);
+            right_info = remember(right, {ValueType::Error, "", false});
+        } else if (right_symbol != nullptr && right_symbol->type == FieldType::Choice &&
+                   (left->kind == ExpressionKind::Name ||
+                    left->kind == ExpressionKind::StringLiteral) &&
+                   contains_option(*right_symbol, left->value)) {
+            left_info = remember(left, {ValueType::Choice, right_symbol->name, true});
+            right_info = analyze_name(right);
         } else if (right_symbol != nullptr && right_symbol->type == FieldType::Choice &&
                    left->kind == ExpressionKind::Name && left_symbol == nullptr) {
             left_info = analyze_name(left, right_symbol);
+            right_info = analyze_name(right);
+        } else if (right_symbol != nullptr && right_symbol->type == FieldType::Choice &&
+                   left->kind == ExpressionKind::StringLiteral) {
+            add_diagnostic(
+                result,
+                "SEM005",
+                "'" + left->value + "' is not an option of choice field '" +
+                    right_symbol->name + "'",
+                left->span);
+            left_info = remember(left, {ValueType::Error, "", false});
+            right_info = analyze_name(right);
+        } else if (left_symbol != nullptr && left_symbol->type == FieldType::Date &&
+                   right->kind == ExpressionKind::StringLiteral) {
+            left_info = analyze_name(left);
+            if (!valid_iso_date(right->value)) {
+                add_diagnostic(result, "SEM017", "invalid date literal '" + right->value +
+                                   "'; expected YYYY-MM-DD", right->span);
+                right_info = remember(right, {ValueType::Error, "", false});
+            } else {
+                right_info = remember(right, {ValueType::Date, "", false});
+            }
+        } else if (right_symbol != nullptr && right_symbol->type == FieldType::Date &&
+                   left->kind == ExpressionKind::StringLiteral) {
+            if (!valid_iso_date(left->value)) {
+                add_diagnostic(result, "SEM017", "invalid date literal '" + left->value +
+                                   "'; expected YYYY-MM-DD", left->span);
+                left_info = remember(left, {ValueType::Error, "", false});
+            } else {
+                left_info = remember(left, {ValueType::Date, "", false});
+            }
             right_info = analyze_name(right);
         } else {
             left_info = analyze_expression(left);

@@ -64,6 +64,19 @@ check_failure examples/hidden_required.vista ANL003 "category=general, certifica
 check_failure examples/boolean_hidden_required.vista ANL003 "employed=false, employer.visible=false, employer.required=true"
 check_failure examples/numeric_analysis_limit.vista ANL900 "outside Boolean/choice witness analysis"
 
+collision_dependencies="$($binary examples/choice_field_collision.vista --emit dependencies 2>&1)"
+collision_status=$?
+if [[ $collision_status -ne 0 ]]; then
+    echo "FAIL: choice/field collision dependency analysis returned $collision_status"
+    echo "$collision_dependencies"
+    failures=$((failures + 1))
+fi
+expect_contains "$collision_dependencies" "program_details   program" "choice literal collision dependency"
+if grep -Eq 'program_details +other' <<<"$collision_dependencies"; then
+    echo "FAIL: choice literal was incorrectly treated as a field dependency"
+    failures=$((failures + 1))
+fi
+
 if [[ $failures -ne 0 ]]; then
     echo "$failures Stage 5 test(s) failed."
     exit 1

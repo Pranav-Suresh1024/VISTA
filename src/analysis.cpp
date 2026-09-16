@@ -31,19 +31,22 @@ std::string dependency_kind_name(DependencyKind kind) {
 }
 
 void collect_references(const Expression* expression,
-                        const SymbolTable& symbols,
+                        const SemanticResult& semantics,
                         std::vector<std::string>& references) {
     if (expression == nullptr) {
         return;
     }
-    if (expression->kind == ExpressionKind::Name &&
-        symbols.find(expression->value) != nullptr &&
+    const auto information = semantics.expressions.find(expression);
+    const bool choice_literal = information != semantics.expressions.end() &&
+                                information->second.choice_literal;
+    if (expression->kind == ExpressionKind::Name && !choice_literal &&
+        semantics.symbols.find(expression->value) != nullptr &&
         std::find(references.begin(), references.end(), expression->value) ==
             references.end()) {
         references.push_back(expression->value);
     }
-    collect_references(expression->left, symbols, references);
-    collect_references(expression->right, symbols, references);
+    collect_references(expression->left, semantics, references);
+    collect_references(expression->right, semantics, references);
 }
 
 bool is_finite_field(const Symbol* symbol) {
@@ -78,7 +81,11 @@ bool expression_is_finite(const Expression* expression,
                        expression_is_finite(expression->right, semantics);
             }
             return false;
-        case ExpressionKind::StringLiteral:
+        case ExpressionKind::StringLiteral: {
+            const auto information = semantics.expressions.find(expression);
+            return information != semantics.expressions.end() &&
+                   information->second.choice_literal;
+        }
         case ExpressionKind::IntegerLiteral:
         case ExpressionKind::DecimalLiteral:
             return false;
@@ -93,6 +100,11 @@ std::optional<bool> evaluate_condition(const Expression* expression,
 std::optional<std::string> evaluate_scalar(const Expression* expression,
                                            const SemanticResult& semantics,
                                            const Assignment& assignment) {
+    const auto expression_information = semantics.expressions.find(expression);
+    if (expression_information != semantics.expressions.end() &&
+        expression_information->second.choice_literal) {
+        return expression->value;
+    }
     if (expression->kind == ExpressionKind::BooleanLiteral) {
         return expression->value;
     }
@@ -107,11 +119,6 @@ std::optional<std::string> evaluate_scalar(const Expression* expression,
             }
         }
         return std::nullopt;
-    }
-
-    const auto information = semantics.expressions.find(expression);
-    if (information != semantics.expressions.end() && information->second.choice_literal) {
-        return expression->value;
     }
 
     const auto value = assignment.find(expression->value);
@@ -227,7 +234,7 @@ void analyze_hidden_required(const FieldDecl& field,
     std::unordered_set<std::string> used_names;
     for (const Expression* condition : conditions) {
         std::vector<std::string> references;
-        collect_references(condition, semantics.symbols, references);
+        collect_references(condition, semantics, references);
         used_names.insert(references.begin(), references.end());
     }
 
@@ -393,7 +400,7 @@ AnalysisResult analyze_dependencies(const FormAst& form,
             }
 
             std::vector<std::string> references;
-            collect_references(property->condition, semantics.symbols, references);
+            collect_references(property->condition, semantics, references);
             for (const std::string& reference : references) {
                 result.dependencies.push_back(
                     {reference, field.name, kind, property->span});

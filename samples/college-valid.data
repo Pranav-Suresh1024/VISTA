@@ -1,0 +1,13 @@
+applicant_name = "Aditi Rao"
+email_address = aditi.rao@example.com
+phone_number = "+91 98765 43210"
+date_of_birth = 2006-04-20
+previous_institution = "Sunbeam Junior College"
+qualification = higher_secondary
+graduation_year = 2024
+previous_score = 88.5
+program = other
+other_program = "Artificial Intelligence"
+transcript = transcript.pdf
+applicant_statement = "I want to study computing and develop reliable software that solves practical problems."
+declaration = true

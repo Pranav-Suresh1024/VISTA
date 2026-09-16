@@ -17,7 +17,18 @@ expect_contains() {
 }
 
 version_output="$($binary --version)"
-expect_contains "$version_output" "VISTA 0.6.0" "version output"
+expect_contains "$version_output" "VISTA 0.7.0" "version output"
+
+$binary --help extra >/dev/null 2>&1
+if [[ $? -ne 2 ]]; then
+    echo "FAIL: --help accepted an extra argument"
+    failures=$((failures + 1))
+fi
+$binary --version extra >/dev/null 2>&1
+if [[ $? -ne 2 ]]; then
+    echo "FAIL: --version accepted an extra argument"
+    failures=$((failures + 1))
+fi
 
 help_output="$($binary --help)"
 expect_contains "$help_output" "Usage: vista <source.vista> --emit <tokens|ast|symbols|dependencies|graph|diagnostics>" "help usage"

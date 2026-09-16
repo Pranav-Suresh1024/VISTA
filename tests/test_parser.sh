@@ -103,6 +103,15 @@ if grep -Fq "Form BrokenForm" <<<"$lexical_output"; then
     failures=$((failures + 1))
 fi
 
+duplicate_title_output="$($binary examples/duplicate_form_title.vista --emit ast 2>&1)"
+duplicate_title_status=$?
+if [[ $duplicate_title_status -ne 1 ]]; then
+    echo "FAIL: duplicate form title returned $duplicate_title_status instead of 1"
+    failures=$((failures + 1))
+fi
+expect_contains "$duplicate_title_output" "SYN002" "duplicate form title diagnostic"
+expect_contains "$duplicate_title_output" "form title is declared more than once" "duplicate title explanation"
+
 if [[ $failures -ne 0 ]]; then
     echo "$failures Stage 3 test(s) failed."
     exit 1

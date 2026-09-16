@@ -53,8 +53,8 @@ void emit_error(std::string code, std::string message) {
 %}
 
 IDENTIFIER      [A-Za-z_][A-Za-z0-9_]*
-INTEGER         [0-9]+
-DECIMAL         [0-9]+\.[0-9]+
+INTEGER         -?[0-9]+
+DECIMAL         -?([0-9]+\.[0-9]*|\.[0-9]+)([eE][+-]?[0-9]+)?|-?[0-9]+[eE][+-]?[0-9]+
 STRING          \"([^\"\\\n]|\\[\"\\nrt])*\"
 BAD_STRING      \"([^\"\\\n]|\\.)*
 

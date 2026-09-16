@@ -1,0 +1,12 @@
+attendee_name = "Sam Lee"
+email_address = sam.lee@example.com
+phone_number = "+91 98765 43210"
+event = workshop
+attendance_mode = in_person
+attendee_count = 2
+bringing_guest = true
+guest_name = "Alex Lee"
+workshop_track = data_science
+meal_requirements = "Vegetarian meal"
+accessibility_support = false
+declaration = true

@@ -1,0 +1,15 @@
+# Deliberately invalid: edit these values during the CLI demonstration
+full_name = "M"
+email_address = invalid-email
+phone_number = abc
+date_of_birth = 2012-08-15
+institution = "VIT Chennai"
+course = other
+study_year = postgraduate
+gpa = 11
+household_income = 900000
+applicant_category = reserved
+personal_statement = "Too short"
+enrollment_proof = enrollment.pdf
+income_proof = income.pdf
+declaration = false

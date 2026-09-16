@@ -88,4 +88,4 @@ if [[ $failures -ne 0 ]]; then
     exit 1
 fi
 
-echo "Complete Phase 2 pipeline and failure-path tests passed."
+echo "Complete VISTA compiler and validation pipeline tests passed."

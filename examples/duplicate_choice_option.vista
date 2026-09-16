@@ -1,0 +1,5 @@
+form DuplicateChoiceOption {
+  field category: choice { general, general } {
+    label "Category"
+  }
+}
