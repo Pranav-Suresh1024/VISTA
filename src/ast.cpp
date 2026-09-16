@@ -63,6 +63,9 @@ void print_expression(std::ostringstream& output,
 std::string property_name(PropertyKind kind) {
     switch (kind) {
         case PropertyKind::Label: return "Label";
+        case PropertyKind::Section: return "Section";
+        case PropertyKind::Help: return "Help";
+        case PropertyKind::Placeholder: return "Placeholder";
         case PropertyKind::Required: return "Required";
         case PropertyKind::RequiredWhen: return "RequiredWhen";
         case PropertyKind::ShowWhen: return "ShowWhen";
@@ -88,6 +91,12 @@ std::string field_type_name(FieldType type) {
 std::string format_ast(const FormAst& form) {
     std::ostringstream output;
     output << "Form " << form.name << ' ' << location_text(form.span) << '\n';
+    if (form.title != form.name) {
+        output << "  Title " << display_lexeme(form.title) << '\n';
+    }
+    if (!form.description.empty()) {
+        output << "  Description " << display_lexeme(form.description) << '\n';
+    }
 
     for (const Declaration* declaration : form.declarations) {
         if (declaration->kind == DeclarationKind::Field) {
@@ -109,7 +118,10 @@ std::string format_ast(const FormAst& form) {
             for (const FieldProperty* property : field.properties) {
                 indent(output, 2);
                 output << property_name(property->kind);
-                if (property->kind == PropertyKind::Label) {
+                if (property->kind == PropertyKind::Label ||
+                    property->kind == PropertyKind::Section ||
+                    property->kind == PropertyKind::Help ||
+                    property->kind == PropertyKind::Placeholder) {
                     output << ' ' << display_lexeme(property->text);
                 }
                 output << ' ' << location_text(property->span) << '\n';

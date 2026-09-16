@@ -27,6 +27,8 @@ struct ParserContext {
     const std::vector<Token>& tokens;
     ParseResult& result;
     std::size_t next_token = 0;
+    std::string form_title;
+    std::string form_description;
 };
 
 ParseResult parse_tokens(const std::vector<Token>& tokens);

@@ -68,6 +68,9 @@ struct Expression final : AstNode {
 
 enum class PropertyKind {
     Label,
+    Section,
+    Help,
+    Placeholder,
     Required,
     RequiredWhen,
     ShowWhen
@@ -136,13 +139,19 @@ struct Declaration final : AstNode {
 
 struct FormAst final : AstNode {
     FormAst(std::string form_name,
+            std::string form_title,
+            std::string form_description,
             std::vector<Declaration*> form_declarations,
             SourceSpan source_span)
         : AstNode(source_span),
           name(std::move(form_name)),
+          title(form_title.empty() ? name : std::move(form_title)),
+          description(std::move(form_description)),
           declarations(std::move(form_declarations)) {}
 
     std::string name;
+    std::string title;
+    std::string description;
     std::vector<Declaration*> declarations;
 };
 

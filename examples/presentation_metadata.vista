@@ -1,0 +1,45 @@
+form ScholarshipApplication {
+  title "Undergraduate Scholarship Application"
+  description "Share your details and study information to begin your scholarship application. Fields marked with an asterisk are required."
+
+  field name: text {
+    label "Full name"
+    section "Your details"
+    help "Enter your name as it appears on official documents."
+    placeholder "e.g. Maya Patel"
+    required
+  }
+
+  field email: text {
+    label "Email address"
+    section "Your details"
+    help "We will use this address for application updates."
+    placeholder "you@example.com"
+    required
+  }
+
+  field category: choice { general, reserved } {
+    label "Applicant category"
+    section "Scholarship details"
+    help "Choose the category that best matches your application."
+    placeholder "Choose a category"
+    required
+  }
+
+  field certificate: file {
+    label "Category certificate"
+    section "Scholarship details"
+    help "Attach supporting proof if you selected the reserved category."
+    show when category == reserved
+    required when category == reserved
+  }
+
+  field age: integer {
+    label "Age"
+    section "Scholarship details"
+    placeholder "Age in years"
+  }
+
+  check name != "" message "Enter your full name"
+  check age >= 18 and category != general message "Review the application"
+}

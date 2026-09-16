@@ -115,7 +115,11 @@ program:
     FORM IDENTIFIER LEFT_BRACE declaration_list RIGHT_BRACE
     {
         context.result.form = context.result.arena.make<vista::FormAst>(
-            *$2, std::move(*$4), make_span(@1, @5));
+            *$2,
+            std::move(context.form_title),
+            std::move(context.form_description),
+            std::move(*$4),
+            make_span(@1, @5));
         delete $2;
         delete $4;
     }
@@ -131,6 +135,22 @@ declaration_list:
         if ($2 != nullptr) {
             $1->push_back($2);
         }
+        $$ = $1;
+    }
+  | declaration_list IDENTIFIER STRING_LITERAL
+    {
+        if (*$2 == "title") {
+            context.form_title = *$3;
+        } else if (*$2 == "description") {
+            context.form_description = *$3;
+        } else {
+            delete $2;
+            delete $3;
+            yyerror(&@2, context, "unknown form presentation property");
+            YYERROR;
+        }
+        delete $2;
+        delete $3;
         $$ = $1;
     }
 ;
@@ -226,6 +246,26 @@ field_property:
     {
         $$ = context.result.arena.make<vista::FieldProperty>(
             vista::PropertyKind::Label, *$2, nullptr, make_span(@1, @2));
+        delete $2;
+    }
+  | IDENTIFIER STRING_LITERAL
+    {
+        vista::PropertyKind kind;
+        if (*$1 == "section") {
+            kind = vista::PropertyKind::Section;
+        } else if (*$1 == "help") {
+            kind = vista::PropertyKind::Help;
+        } else if (*$1 == "placeholder") {
+            kind = vista::PropertyKind::Placeholder;
+        } else {
+            delete $1;
+            delete $2;
+            yyerror(&@1, context, "unknown field presentation property");
+            YYERROR;
+        }
+        $$ = context.result.arena.make<vista::FieldProperty>(
+            kind, *$2, nullptr, make_span(@1, @2));
+        delete $1;
         delete $2;
     }
   | REQUIRED

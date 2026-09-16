@@ -1,0 +1,11 @@
+form EscapedPresentation {
+  title "Safe <title> & \"form\""
+  description "Description <script>alert(\"x\")</script> & text"
+
+  field sample: text {
+    label "Sample field"
+    section "<Applicant & group>"
+    help "Text & details <safe>"
+    placeholder "e.g. \"value\""
+  }
+}
