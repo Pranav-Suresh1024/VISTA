@@ -44,7 +44,10 @@ enum class TokenKind : int {
     LeftParen,
     RightParen,
     Colon,
-    Comma
+    Comma,
+    TypeEmail,
+    TypePhone,
+    TypeTextarea
 };
 
 struct Token {

@@ -1,0 +1,7 @@
+form InvertedNumericConstraints {
+  field score: decimal {
+    label "Score"
+    minimum 5
+    maximum 3
+  }
+}

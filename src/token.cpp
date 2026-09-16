@@ -43,6 +43,9 @@ std::string_view token_kind_name(TokenKind kind) {
         case TokenKind::RightParen: return "RIGHT_PAREN";
         case TokenKind::Colon: return "COLON";
         case TokenKind::Comma: return "COMMA";
+        case TokenKind::TypeEmail: return "TYPE_EMAIL";
+        case TokenKind::TypePhone: return "TYPE_PHONE";
+        case TokenKind::TypeTextarea: return "TYPE_TEXTAREA";
     }
     return "UNKNOWN";
 }

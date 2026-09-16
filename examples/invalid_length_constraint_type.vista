@@ -1,0 +1,6 @@
+form InvalidLengthConstraintType {
+  field email: email {
+    label "Email"
+    max_length 120
+  }
+}

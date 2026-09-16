@@ -1,0 +1,7 @@
+form InvertedLengthConstraints {
+  field statement: textarea {
+    label "Statement"
+    min_length 50
+    max_length 20
+  }
+}

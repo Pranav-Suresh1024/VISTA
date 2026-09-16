@@ -1,0 +1,6 @@
+form InvalidNumericConstraintType {
+  field note: text {
+    label "Note"
+    minimum 1
+  }
+}

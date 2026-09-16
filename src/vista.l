@@ -80,6 +80,9 @@ BAD_STRING      \"([^\"\\\n]|\\.)*
 "date"         { TOKEN(TypeDate); }
 "choice"       { TOKEN(TypeChoice); }
 "file"         { TOKEN(TypeFile); }
+"email"        { TOKEN(TypeEmail); }
+"phone"        { TOKEN(TypePhone); }
+"textarea"     { TOKEN(TypeTextarea); }
 
 "true"         { TOKEN(TrueLiteral); }
 "false"        { TOKEN(FalseLiteral); }

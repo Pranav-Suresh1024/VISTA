@@ -22,6 +22,22 @@ static vista::SourceSpan make_span(const YYLTYPE& first, const YYLTYPE& last) {
         static_cast<std::size_t>(last.last_column)
     };
 }
+
+static bool constraint_kind_for_name(const std::string& name,
+                                     vista::PropertyKind& kind) {
+    if (name == "minimum") {
+        kind = vista::PropertyKind::Minimum;
+    } else if (name == "maximum") {
+        kind = vista::PropertyKind::Maximum;
+    } else if (name == "min_length") {
+        kind = vista::PropertyKind::MinLength;
+    } else if (name == "max_length") {
+        kind = vista::PropertyKind::MaxLength;
+    } else {
+        return false;
+    }
+    return true;
+}
 }
 
 %code provides {
@@ -89,7 +105,11 @@ void yyerror(YYLTYPE* location,
 %token RIGHT_PAREN 289 ")"
 %token COLON 290 ":"
 %token COMMA 291 ","
+%token <text> TYPE_EMAIL 292 "email"
+%token <text> TYPE_PHONE 293 "phone"
+%token <text> TYPE_TEXTAREA 294 "textarea"
 
+%type <text> identifier
 %type <declaration_list> declaration_list
 %type <declaration> declaration
 %type <field> field_declaration
@@ -112,7 +132,7 @@ void yyerror(YYLTYPE* location,
 %%
 
 program:
-    FORM IDENTIFIER LEFT_BRACE declaration_list RIGHT_BRACE
+    FORM identifier LEFT_BRACE declaration_list RIGHT_BRACE
     {
         context.result.form = context.result.arena.make<vista::FormAst>(
             *$2,
@@ -172,7 +192,7 @@ declaration:
 ;
 
 field_declaration:
-    FIELD IDENTIFIER COLON field_type LEFT_BRACE property_list RIGHT_BRACE
+    FIELD identifier COLON field_type LEFT_BRACE property_list RIGHT_BRACE
     {
         $$ = context.result.arena.make<vista::FieldDecl>(
             *$2, std::move(*$4), std::move(*$6), make_span(@1, @7));
@@ -207,6 +227,21 @@ field_type:
     {
         $$ = new vista::TypeSpec{vista::FieldType::File, {}};
     }
+  | TYPE_EMAIL
+    {
+        $$ = new vista::TypeSpec{vista::FieldType::Email, {}};
+        delete $1;
+    }
+  | TYPE_PHONE
+    {
+        $$ = new vista::TypeSpec{vista::FieldType::Phone, {}};
+        delete $1;
+    }
+  | TYPE_TEXTAREA
+    {
+        $$ = new vista::TypeSpec{vista::FieldType::Textarea, {}};
+        delete $1;
+    }
   | TYPE_CHOICE LEFT_BRACE option_list RIGHT_BRACE
     {
         $$ = new vista::TypeSpec{vista::FieldType::Choice, std::move(*$3)};
@@ -215,13 +250,13 @@ field_type:
 ;
 
 option_list:
-    IDENTIFIER
+    identifier
     {
         $$ = new std::vector<std::string>();
         $$->push_back(*$1);
         delete $1;
     }
-  | option_list COMMA IDENTIFIER
+  | option_list COMMA identifier
     {
         $1->push_back(*$3);
         delete $3;
@@ -268,6 +303,34 @@ field_property:
         delete $1;
         delete $2;
     }
+  | IDENTIFIER INTEGER_LITERAL
+    {
+        vista::PropertyKind kind;
+        if (!constraint_kind_for_name(*$1, kind)) {
+            delete $1;
+            delete $2;
+            yyerror(&@1, context, "unknown field constraint");
+            YYERROR;
+        }
+        $$ = context.result.arena.make<vista::FieldProperty>(
+            kind, *$2, nullptr, make_span(@1, @2));
+        delete $1;
+        delete $2;
+    }
+  | IDENTIFIER DECIMAL_LITERAL
+    {
+        vista::PropertyKind kind;
+        if (!constraint_kind_for_name(*$1, kind)) {
+            delete $1;
+            delete $2;
+            yyerror(&@1, context, "unknown field constraint");
+            YYERROR;
+        }
+        $$ = context.result.arena.make<vista::FieldProperty>(
+            kind, *$2, nullptr, make_span(@1, @2));
+        delete $1;
+        delete $2;
+    }
   | REQUIRED
     {
         $$ = context.result.arena.make<vista::FieldProperty>(
@@ -295,7 +358,7 @@ check_declaration:
 ;
 
 expression:
-    IDENTIFIER
+    identifier
     {
         $$ = context.result.arena.make<vista::Expression>(
             vista::ExpressionKind::Name, *$1, make_span(@1, @1));
@@ -378,6 +441,25 @@ expression:
     {
         $$ = context.result.arena.make<vista::Expression>(
             vista::ExpressionKind::Binary, ">=", make_span(@1, @3), $1, $3);
+    }
+;
+
+identifier:
+    IDENTIFIER
+    {
+        $$ = $1;
+    }
+  | TYPE_EMAIL
+    {
+        $$ = $1;
+    }
+  | TYPE_PHONE
+    {
+        $$ = $1;
+    }
+  | TYPE_TEXTAREA
+    {
+        $$ = $1;
     }
 ;
 

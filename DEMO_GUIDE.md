@@ -1,4 +1,4 @@
-# VISTA Phase 2 Demonstration Guide
+# VISTA Phase 2 Scholarship Demonstration Guide
 
 This guide presents the current working prototype in about five minutes.
 
@@ -19,7 +19,7 @@ The final test line must be:
 Complete Phase 2 pipeline and failure-path tests passed.
 ```
 
-The demonstration bundle will be in `out/demo/`.
+The demonstration bundle will be in `out/phase2-scholarship/`.
 
 ## 1. Introduce the project
 
@@ -30,7 +30,7 @@ Say:
 Show the input:
 
 ```bash
-sed -n '1,120p' examples/valid_scholarship.vista
+sed -n '1,180p' templates/scholarship_application.vista
 ```
 
 Explain that the input is a `.vista` source file, not an interactive prompt.
@@ -47,21 +47,21 @@ Point out that each compiler module was added as a focused commit and every test
 ## 3. Compile the valid form
 
 ```bash
-./build/vista examples/valid_scholarship.vista \
+./build/vista templates/scholarship_application.vista \
   --emit all \
-  --out-dir out/demo
+  --out-dir out/phase2-scholarship
 ```
 
 The command should print:
 
 ```text
-Generated complete VISTA output in out/demo
+Generated complete VISTA output in out/phase2-scholarship
 ```
 
 Show the generated files:
 
 ```bash
-ls -1 out/demo
+ls -1 out/phase2-scholarship
 ```
 
 Expected files:
@@ -79,11 +79,11 @@ tokens.txt
 ## 4. Explain intermediate compiler results
 
 ```bash
-sed -n '1,18p' out/demo/tokens.txt
-sed -n '1,40p' out/demo/ast.txt
-cat out/demo/symbols.txt
-cat out/demo/dependencies.txt
-cat out/demo/diagnostics.txt
+sed -n '1,18p' out/phase2-scholarship/tokens.txt
+sed -n '1,40p' out/phase2-scholarship/ast.txt
+cat out/phase2-scholarship/symbols.txt
+cat out/phase2-scholarship/dependencies.txt
+cat out/phase2-scholarship/diagnostics.txt
 ```
 
 Use these explanations:
@@ -97,15 +97,16 @@ Use these explanations:
 
 ## 5. Demonstrate the generated form
 
-Open `out/demo/form.html` in a browser.
+Open `out/phase2-scholarship/form.html` in a browser.
 
-1. Select `general`. The certificate field remains hidden.
+1. Select `general`. The category certificate field stays hidden.
 2. Select `reserved`. The certificate field appears and becomes required.
-3. Enter a name, choose `general`, and enter an age below 18.
-4. Select **Validate form**. The check message appears.
-5. Enter age `18` or above, choose `reserved`, attach any local test file, and select **Validate form** again. The page reports that validation passed.
+3. Try to submit with required fields empty; the browser focuses a missing field and shows its native validation message.
+4. Enter an invalid email or a GPA outside `0`–`10`; the browser rejects it using the generated input constraints.
+5. Enter a statement shorter than 50 characters; the browser reports the minimum-length requirement.
+6. Fill the fields with valid sample values, choose `general`, attach sample files, check the declaration, and validate again. The page reports that validation passed.
 
-Explain that the HTML, CSS, and restricted validation JavaScript are embedded in one file and use no external framework.
+Explain that the HTML, CSS, and restricted validation JavaScript are embedded in one file and use no external framework. This is a browser-side demonstration; it does not upload files, submit applications, or store personal information.
 
 ## 6. Demonstrate the novelty feature
 

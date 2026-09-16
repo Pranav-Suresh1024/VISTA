@@ -69,6 +69,10 @@ std::string property_name(PropertyKind kind) {
         case PropertyKind::Required: return "Required";
         case PropertyKind::RequiredWhen: return "RequiredWhen";
         case PropertyKind::ShowWhen: return "ShowWhen";
+        case PropertyKind::Minimum: return "Minimum";
+        case PropertyKind::Maximum: return "Maximum";
+        case PropertyKind::MinLength: return "MinLength";
+        case PropertyKind::MaxLength: return "MaxLength";
     }
     return "UnknownProperty";
 }
@@ -84,6 +88,9 @@ std::string field_type_name(FieldType type) {
         case FieldType::Date: return "date";
         case FieldType::Choice: return "choice";
         case FieldType::File: return "file";
+        case FieldType::Email: return "email";
+        case FieldType::Phone: return "phone";
+        case FieldType::Textarea: return "textarea";
     }
     return "unknown";
 }
@@ -123,6 +130,11 @@ std::string format_ast(const FormAst& form) {
                     property->kind == PropertyKind::Help ||
                     property->kind == PropertyKind::Placeholder) {
                     output << ' ' << display_lexeme(property->text);
+                } else if (property->kind == PropertyKind::Minimum ||
+                           property->kind == PropertyKind::Maximum ||
+                           property->kind == PropertyKind::MinLength ||
+                           property->kind == PropertyKind::MaxLength) {
+                    output << ' ' << property->text;
                 }
                 output << ' ' << location_text(property->span) << '\n';
                 if (property->condition != nullptr) {

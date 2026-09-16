@@ -30,7 +30,10 @@ enum class FieldType {
     Boolean,
     Date,
     Choice,
-    File
+    File,
+    Email,
+    Phone,
+    Textarea
 };
 
 struct TypeSpec {
@@ -73,7 +76,11 @@ enum class PropertyKind {
     Placeholder,
     Required,
     RequiredWhen,
-    ShowWhen
+    ShowWhen,
+    Minimum,
+    Maximum,
+    MinLength,
+    MaxLength
 };
 
 struct FieldProperty final : AstNode {

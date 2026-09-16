@@ -1,0 +1,6 @@
+form DecimalTextLength {
+  field statement: textarea {
+    label "Statement"
+    min_length 2.5
+  }
+}

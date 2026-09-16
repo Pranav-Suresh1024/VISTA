@@ -43,6 +43,9 @@ VISTA_ASSERT_TOKEN(LeftParen, LEFT_PAREN);
 VISTA_ASSERT_TOKEN(RightParen, RIGHT_PAREN);
 VISTA_ASSERT_TOKEN(Colon, COLON);
 VISTA_ASSERT_TOKEN(Comma, COMMA);
+VISTA_ASSERT_TOKEN(TypeEmail, TYPE_EMAIL);
+VISTA_ASSERT_TOKEN(TypePhone, TYPE_PHONE);
+VISTA_ASSERT_TOKEN(TypeTextarea, TYPE_TEXTAREA);
 
 #undef VISTA_ASSERT_TOKEN
 
@@ -93,6 +96,9 @@ int yylex(YYSTYPE* semantic_value,
         case vista::TokenKind::Identifier:
         case vista::TokenKind::IntegerLiteral:
         case vista::TokenKind::DecimalLiteral:
+        case vista::TokenKind::TypeEmail:
+        case vista::TokenKind::TypePhone:
+        case vista::TokenKind::TypeTextarea:
             semantic_value->text = new std::string(token.lexeme);
             break;
         case vista::TokenKind::StringLiteral:

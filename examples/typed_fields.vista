@@ -1,0 +1,16 @@
+form TypedFields {
+  field email: email { label "Email address" required }
+  field phone: phone { label "Phone number" required }
+  field textarea: textarea {
+    label "Personal statement"
+    min_length 5
+    max_length 200
+  }
+  field score: decimal {
+    label "Score"
+    minimum 0
+    maximum 4.0
+  }
+
+  check email != "" message "Enter an email address"
+}

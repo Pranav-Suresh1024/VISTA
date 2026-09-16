@@ -50,6 +50,21 @@ done
 expect_contains "$catalogue_output" "Unary not" "unary expression"
 expect_contains "$catalogue_output" "Binary or" "or expression"
 
+typed_output="$($binary examples/typed_fields.vista --emit ast 2>&1)"
+typed_status=$?
+if [[ $typed_status -ne 0 ]]; then
+    echo "FAIL: new field types or constraint syntax did not parse"
+    echo "$typed_output"
+    failures=$((failures + 1))
+fi
+expect_contains "$typed_output" "Field email : email" "email field type"
+expect_contains "$typed_output" "Field phone : phone" "phone field type"
+expect_contains "$typed_output" "Field textarea : textarea" "textarea field type"
+expect_contains "$typed_output" "Minimum 0" "numeric minimum AST property"
+expect_contains "$typed_output" "Maximum 4.0" "numeric maximum AST property"
+expect_contains "$typed_output" "MinLength 5" "text minimum length AST property"
+expect_contains "$typed_output" "MaxLength 200" "text maximum length AST property"
+
 syntax_output="$($binary examples/syntax_error.vista --emit ast 2>&1)"
 syntax_status=$?
 if [[ $syntax_status -ne 1 ]]; then

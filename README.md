@@ -42,6 +42,7 @@ The executable is created at `build/vista`.
 ./build/vista examples/hidden_required.vista --emit diagnostics
 ./build/vista examples/valid_scholarship.vista --emit html --out-dir out/scholarship
 ./build/vista examples/valid_scholarship.vista --emit all --out-dir out/demo
+./build/vista templates/scholarship_application.vista --emit all --out-dir out/scholarship-demo
 ```
 
 The token table contains each token's source location, classification, and original lexeme. Whitespace and `//` comments are ignored while their positions are still counted.
@@ -57,7 +58,9 @@ make demo
 
 Witness analysis exhaustively checks finite Boolean and choice assignments. Numeric, date, and text-dependent reasoning is deliberately reported as `ANL900` rather than approximated.
 
-HTML is generated only after every earlier compiler stage succeeds. The generated file contains accessible labels, native controls for all VISTA field types, embedded conditional behavior, escaped author-provided text, and check-message validation without external libraries.
+HTML is generated only after every earlier compiler stage succeeds. The language supports text, email, phone, textarea, integer, decimal, Boolean, date, choice, and file controls. Numeric fields can declare `minimum` and `maximum`; textareas can declare `min_length` and `max_length`. The generated file contains accessible labels, native browser constraints, embedded conditional behavior, escaped author-provided text, and check-message validation without external libraries.
+
+The fuller Phase 2 Scholarship form is an editable source file at `templates/scholarship_application.vista`. Compile it with the command above or run `make demo`; the generated page validates locally in the browser and does not submit or store applications.
 
 `--emit all` is the recommended demonstration command. It writes `tokens.txt`, `ast.txt`, `symbols.txt`, `dependencies.txt`, `graph.dot`, `diagnostics.txt`, and `form.html` into one output directory. Failed compilations write the intermediate results reached and `diagnostics.txt`, but never generate `form.html`.
 
@@ -69,6 +72,7 @@ For the review walkthrough and current implementation evidence, see [DEMO_GUIDE.
 include/       C++ headers
 src/           C++ source files
 examples/      Valid and invalid VISTA inputs
+templates/     The Phase 2 Scholarship application source
 tests/         Cumulative end-to-end tests
 build/         Generated executable, not committed
 Makefile       WSL build, test, and demo commands

@@ -74,6 +74,20 @@ expect_contains "$types_dir/form.html" 'type="checkbox" data-type="boolean"' "Bo
 expect_contains "$types_dir/form.html" 'type="date" data-type="date"' "date control"
 expect_contains "$types_dir/form.html" 'type="file" data-type="file"' "file control"
 
+typed_dir="$output_root/typed-fields"
+$binary examples/typed_fields.vista --emit html --out-dir "$typed_dir" >/dev/null 2>&1
+typed_status=$?
+if [[ $typed_status -ne 0 ]]; then
+    echo "FAIL: typed field HTML generation returned $typed_status"
+    failures=$((failures + 1))
+fi
+expect_contains "$typed_dir/form.html" 'type="email" data-type="email"' "email control"
+expect_contains "$typed_dir/form.html" 'autocomplete="email"' "email autocomplete hint"
+expect_contains "$typed_dir/form.html" 'type="tel" data-type="phone"' "phone control"
+expect_contains "$typed_dir/form.html" 'inputmode="tel" autocomplete="tel"' "phone keyboard hint"
+expect_contains "$typed_dir/form.html" '<textarea id="textarea" name="textarea" data-type="textarea" rows="6" minlength="5" maxlength="200"></textarea>' "textarea length constraints"
+expect_contains "$typed_dir/form.html" 'min="0" max="4.0"' "numeric min/max constraints"
+
 escaping_dir="$output_root/escaping"
 $binary examples/safe_escaping.vista --emit html --out-dir "$escaping_dir" >/dev/null 2>&1
 escaping_status=$?

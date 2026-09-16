@@ -1,6 +1,6 @@
 # VISTA Phase 2 Implementation Progress
 
-Date: 15 September 2026
+Date: 16 September 2026
 
 ## Prototype status
 
@@ -24,11 +24,11 @@ VISTA 0.6.0 is a working Phase 2 prototype. It compiles a `.vista` form specific
 | Lexical analysis | Keywords, identifiers, literals, operators, punctuation, comments, positions, illegal characters, unterminated strings | `tokens.txt`, `LEX001`, `LEX002` |
 | Syntax analysis | Yacc-compatible Bison grammar, precedence, AST construction, detailed syntax errors, declaration recovery | `ast.txt`, `SYN001` |
 | Symbol table | Declaration-order insertion and lookup with field type, options, label, and source location | `symbols.txt` |
-| Semantic analysis | Duplicate fields, undefined names, incompatible types, invalid choices, Boolean conditions, missing labels | `SEM001`-`SEM006` |
+| Semantic analysis | Duplicate fields, undefined names, incompatible types, invalid choices, Boolean conditions, missing labels, type-safe numeric and text-length constraints | `SEM001`-`SEM013` |
 | Dependency analysis | Visibility and requirement edges, text table, DOT graph, self-dependencies, DFS cycle detection | `dependencies.txt`, `graph.dot`, `ANL001`, `ANL002` |
 | Witness analysis | Exhaustive Boolean/choice assignments and concrete hidden-required witnesses | `ANL003` |
 | Analysis boundary | Explicit refusal to overclaim unsupported numeric/date/text witness reasoning | `ANL900` |
-| HTML backend | All seven field types, labels, native constraints, conditional behavior, check messages, embedded CSS/JavaScript, output escaping | `form.html` |
+| HTML backend | Ten field types, labels, email/phone/textarea controls, numeric and text-length constraints, conditional behavior, check messages, embedded CSS/JavaScript, output escaping | `form.html` |
 | Integrated pipeline | One command produces all seven evidence files; failed compilation preserves progressive results and removes stale HTML | `--emit all`, `tests/test_pipeline.sh` |
 
 ## Output bundle
@@ -37,6 +37,7 @@ For a valid source, this command:
 
 ```bash
 ./build/vista examples/valid_scholarship.vista --emit all --out-dir out/demo
+./build/vista templates/scholarship_application.vista --emit all --out-dir out/scholarship
 ```
 
 produces:
@@ -56,7 +57,7 @@ produces:
 `make test` performs cumulative end-to-end checks for:
 
 - valid compilation and all expected artifacts;
-- every supported token, expression operator, and field type;
+- every supported token, expression operator, field type, and constraint;
 - token positions and comment handling;
 - lexical failures and unterminated strings;
 - syntax errors and multi-error recovery;
@@ -68,6 +69,7 @@ produces:
 - Boolean and choice hidden-required witnesses;
 - honest unsupported-analysis diagnostics;
 - HTML controls, conditional rules, validation messages, and output escaping;
+- the complete Scholarship template, including native email/phone/textarea controls, GPA and income bounds, statement length, declaration, and category certificate conditions;
 - stale-output cleanup and the guarantee that failed compilations have no `form.html`;
 - command-line and missing-file exit codes.
 

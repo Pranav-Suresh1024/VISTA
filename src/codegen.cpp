@@ -45,6 +45,9 @@ std::string javascript_string(const std::string& text) {
 std::string input_type(FieldType type) {
     switch (type) {
         case FieldType::Text: return "text";
+        case FieldType::Email: return "email";
+        case FieldType::Phone: return "tel";
+        case FieldType::Textarea: return "text";
         case FieldType::Integer:
         case FieldType::Decimal: return "number";
         case FieldType::Boolean: return "checkbox";
@@ -53,6 +56,15 @@ std::string input_type(FieldType type) {
         case FieldType::Choice: return "";
     }
     return "text";
+}
+
+const std::string* constraint_value(const FieldDecl& field, PropertyKind kind) {
+    for (const FieldProperty* property : field.properties) {
+        if (property->kind == kind) {
+            return &property->text;
+        }
+    }
+    return nullptr;
 }
 
 bool is_always_required(const FieldDecl& field) {
@@ -178,11 +190,37 @@ void generate_field(std::ostringstream& output,
                    << html_escape(option) << "</option>\n";
         }
         output << indent << "  </select>\n";
+    } else if (field.type == FieldType::Textarea) {
+        output << indent << "  <textarea id=\"" << field.name << "\" name=\""
+               << field.name << "\" data-type=\"textarea\" rows=\"6\""
+               << (has_help ? " aria-describedby=\"help-" + field.name + "\"" : "");
+        if (placeholder != nullptr && !placeholder->empty()) {
+            output << " placeholder=\"" << html_escape(*placeholder) << "\"";
+        }
+        const std::string* minimum_length =
+            constraint_value(field, PropertyKind::MinLength);
+        const std::string* maximum_length =
+            constraint_value(field, PropertyKind::MaxLength);
+        if (minimum_length != nullptr) {
+            output << " minlength=\"" << *minimum_length << "\"";
+        }
+        if (maximum_length != nullptr) {
+            output << " maxlength=\"" << *maximum_length << "\"";
+        }
+        if (is_always_required(field)) {
+            output << " required";
+        }
+        output << "></textarea>\n";
     } else {
         output << indent << "  <input id=\"" << field.name << "\" name=\""
                << field.name << "\" type=\"" << input_type(field.type)
                << "\" data-type=\"" << field_type_name(field.type) << "\""
                << (has_help ? " aria-describedby=\"help-" + field.name + "\"" : "");
+        if (field.type == FieldType::Phone) {
+            output << " inputmode=\"tel\" autocomplete=\"tel\"";
+        } else if (field.type == FieldType::Email) {
+            output << " autocomplete=\"email\"";
+        }
         if (placeholder != nullptr && !placeholder->empty()) {
             output << " placeholder=\"" << html_escape(*placeholder) << "\"";
         }
@@ -190,6 +228,14 @@ void generate_field(std::ostringstream& output,
             output << " step=\"1\"";
         } else if (field.type == FieldType::Decimal) {
             output << " step=\"any\"";
+        }
+        const std::string* minimum = constraint_value(field, PropertyKind::Minimum);
+        const std::string* maximum = constraint_value(field, PropertyKind::Maximum);
+        if (minimum != nullptr) {
+            output << " min=\"" << *minimum << "\"";
+        }
+        if (maximum != nullptr) {
+            output << " max=\"" << *maximum << "\"";
         }
         if (is_always_required(field)) {
             output << " required";
@@ -229,9 +275,10 @@ std::string generate_html(const FormAst& form,
            << "    .field[hidden] { display: none; }\n"
            << "    .field label { color: #28364d; font-weight: 650; }\n"
            << "    .required-indicator[hidden] { display: none; }\n"
-           << "    .field input, .field select { grid-column: 1 / -1; width: 100%; min-height: 2.9rem; padding: .72rem .85rem; color: #182235; background: #fff; border: 1px solid #bac5d5; border-radius: 9px; font: inherit; transition: border-color .15s, box-shadow .15s; }\n"
+           << "    .field input, .field select, .field textarea { grid-column: 1 / -1; width: 100%; min-height: 2.9rem; padding: .72rem .85rem; color: #182235; background: #fff; border: 1px solid #bac5d5; border-radius: 9px; font: inherit; transition: border-color .15s, box-shadow .15s; }\n"
+           << "    .field textarea { min-height: 9rem; resize: vertical; line-height: 1.55; }\n"
            << "    .field input::placeholder { color: #7b8799; }\n"
-           << "    .field input:focus-visible, .field select:focus-visible, button:focus-visible { outline: 3px solid #2457d64d; outline-offset: 2px; border-color: #2457d6; }\n"
+           << "    .field input:focus-visible, .field select:focus-visible, .field textarea:focus-visible, button:focus-visible { outline: 3px solid #2457d64d; outline-offset: 2px; border-color: #2457d6; }\n"
            << "    .field input[type=checkbox] { grid-column: 1; width: 1.25rem; min-height: 1.25rem; height: 1.25rem; margin: .25rem 0; accent-color: #2457d6; }\n"
            << "    .field-help { grid-column: 1 / -1; color: #58677f; line-height: 1.45; }\n"
            << "    .form-section { margin: 1.75rem 0 2rem; padding: 1.25rem 1.35rem; background: #fbfcff; border: 1px solid #e5eaf2; border-radius: 14px; }\n"

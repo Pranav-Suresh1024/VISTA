@@ -48,6 +48,11 @@ for expected_token in \
     expect_contains "$catalogue_output" "$expected_token" "token catalogue: $expected_token"
 done
 
+typed_output="$($binary examples/typed_fields.vista --emit tokens)"
+for expected_token in TYPE_EMAIL TYPE_PHONE TYPE_TEXTAREA; do
+    expect_contains "$typed_output" "$expected_token" "new field type token: $expected_token"
+done
+
 lexical_output="$($binary examples/lexical_error.vista --emit tokens 2>&1)"
 lexical_status=$?
 if [[ $lexical_status -ne 1 ]]; then

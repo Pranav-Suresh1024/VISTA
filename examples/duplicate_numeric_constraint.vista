@@ -1,0 +1,7 @@
+form DuplicateNumericConstraint {
+  field count: integer {
+    label "Count"
+    minimum 0
+    minimum 1
+  }
+}

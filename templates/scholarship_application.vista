@@ -1,0 +1,123 @@
+form ScholarshipApplication {
+  title "Scholarship Application"
+  description "Complete the sections below to prepare a scholarship application. This prototype validates your entries in this browser only; it does not submit or store them."
+
+  field full_name: text {
+    label "Full legal name"
+    section "Personal and contact details"
+    help "Use the name shown on your official documents."
+    placeholder "e.g. Maya Patel"
+    required
+  }
+
+  field email_address: email {
+    label "Email address"
+    section "Personal and contact details"
+    help "We use this only to demonstrate email-format validation."
+    placeholder "you@example.com"
+    required
+  }
+
+  field phone_number: phone {
+    label "Phone number"
+    section "Personal and contact details"
+    placeholder "+91 98765 43210"
+    required
+  }
+
+  field date_of_birth: date {
+    label "Date of birth"
+    section "Personal and contact details"
+    required
+  }
+
+  field institution: text {
+    label "School, college, or university"
+    section "Institution and course"
+    placeholder "Institution name"
+    required
+  }
+
+  field course: choice { arts, commerce, engineering, science, other } {
+    label "Course or area of study"
+    section "Institution and course"
+    placeholder "Choose an area of study"
+    required
+  }
+
+  field study_year: choice { first, second, third, fourth, postgraduate } {
+    label "Current year of study"
+    section "Institution and course"
+    placeholder "Choose your current year"
+    required
+  }
+
+  field gpa: decimal {
+    label "Current GPA"
+    section "Academic and financial information"
+    help "Enter a value on a 0.0 to 10.0 scale."
+    placeholder "e.g. 8.4"
+    minimum 0
+    maximum 10
+    required
+  }
+
+  field household_income: decimal {
+    label "Annual household income"
+    section "Academic and financial information"
+    help "Enter a non-negative amount in your local currency."
+    placeholder "e.g. 250000"
+    minimum 0
+    maximum 100000000
+    required
+  }
+
+  field applicant_category: choice { general, reserved } {
+    label "Applicant category"
+    section "Scholarship details"
+    placeholder "Choose a category"
+    required
+  }
+
+  field personal_statement: textarea {
+    label "Personal statement"
+    section "Scholarship details"
+    help "Briefly describe your goals and why this scholarship would help."
+    placeholder "Write your statement here..."
+    min_length 50
+    max_length 1000
+    required
+  }
+
+  field enrollment_proof: file {
+    label "Proof of enrollment"
+    section "Supporting documents"
+    help "Choose a local sample file to demonstrate a required upload control."
+    required
+  }
+
+  field income_proof: file {
+    label "Household income document"
+    section "Supporting documents"
+    required
+  }
+
+  field category_certificate: file {
+    label "Category certificate"
+    section "Supporting documents"
+    help "Shown and required only when the reserved category is selected."
+    show when applicant_category == reserved
+    required when applicant_category == reserved
+  }
+
+  field declaration: boolean {
+    label "I confirm that the information above is accurate."
+    section "Declaration"
+    required
+  }
+
+  check full_name != "" message "Enter your full legal name"
+  check gpa >= 0 and gpa <= 10 message "GPA must be between 0 and 10"
+  check household_income >= 0 message "Household income cannot be negative"
+  check declaration == true message "Confirm the declaration before continuing"
+}

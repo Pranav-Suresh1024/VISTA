@@ -1,0 +1,7 @@
+form DecimalIntegerBound {
+  field count: integer {
+    label "Count"
+    minimum 1.5
+    maximum 3
+  }
+}

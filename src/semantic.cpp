@@ -1,6 +1,7 @@
 #include "semantic.hpp"
 
 #include <algorithm>
+#include <cmath>
 #include <iomanip>
 #include <sstream>
 #include <string_view>
@@ -20,6 +21,9 @@ ValueType value_type_for(FieldType type) {
         case FieldType::Date: return ValueType::Date;
         case FieldType::Choice: return ValueType::Choice;
         case FieldType::File: return ValueType::File;
+        case FieldType::Email:
+        case FieldType::Phone:
+        case FieldType::Textarea: return ValueType::Text;
     }
     return ValueType::Error;
 }
@@ -62,6 +66,42 @@ const FieldProperty* first_label(const FieldDecl& field) {
         }
     }
     return nullptr;
+}
+
+std::size_t constraint_index(PropertyKind kind) {
+    switch (kind) {
+        case PropertyKind::Minimum: return 0;
+        case PropertyKind::Maximum: return 1;
+        case PropertyKind::MinLength: return 2;
+        case PropertyKind::MaxLength: return 3;
+        default: return 4;
+    }
+}
+
+bool parse_finite_number(const std::string& text, long double& value) {
+    try {
+        std::size_t parsed = 0;
+        value = std::stold(text, &parsed);
+        return parsed == text.size() && std::isfinite(value);
+    } catch (...) {
+        return false;
+    }
+}
+
+bool parse_length(const std::string& text, unsigned long long& value) {
+    if (text.empty() ||
+        !std::all_of(text.begin(), text.end(), [](unsigned char character) {
+            return character >= '0' && character <= '9';
+        })) {
+        return false;
+    }
+    try {
+        std::size_t parsed = 0;
+        value = std::stoull(text, &parsed);
+        return parsed == text.size();
+    } catch (...) {
+        return false;
+    }
 }
 
 class SemanticAnalyzer {
@@ -133,6 +173,98 @@ private:
             } else if (property->kind == PropertyKind::ShowWhen) {
                 validate_condition(property->condition, "visibility condition");
             }
+        }
+        validate_constraints(field);
+    }
+
+    void validate_constraints(const FieldDecl& field) {
+        const FieldProperty* limits[4] = {nullptr, nullptr, nullptr, nullptr};
+        for (const FieldProperty* property : field.properties) {
+            const std::size_t index = constraint_index(property->kind);
+            if (index == 4) {
+                continue;
+            }
+            if (limits[index] != nullptr) {
+                add_diagnostic(
+                    result,
+                    "SEM012",
+                    "field '" + field.name + "' declares the same constraint more than once",
+                    property->span);
+            } else {
+                limits[index] = property;
+            }
+        }
+
+        const bool has_numeric_limit = limits[0] != nullptr || limits[1] != nullptr;
+        const bool has_length_limit = limits[2] != nullptr || limits[3] != nullptr;
+        const bool numeric_field = field.type == FieldType::Integer ||
+                                   field.type == FieldType::Decimal;
+        if (has_numeric_limit && !numeric_field) {
+            const FieldProperty* property = limits[0] != nullptr ? limits[0] : limits[1];
+            add_diagnostic(
+                result,
+                "SEM007",
+                "minimum and maximum constraints require an integer or decimal field",
+                property->span);
+        } else if (has_numeric_limit) {
+            long double minimum = 0.0L;
+            long double maximum = 0.0L;
+            const bool minimum_is_valid =
+                limits[0] == nullptr || parse_finite_number(limits[0]->text, minimum);
+            const bool maximum_is_valid =
+                limits[1] == nullptr || parse_finite_number(limits[1]->text, maximum);
+            if (!minimum_is_valid || !maximum_is_valid) {
+                add_diagnostic(result, "SEM008", "numeric constraints must be finite values", field.span);
+            } else if (field.type == FieldType::Integer &&
+                       ((limits[0] != nullptr && limits[0]->text.find('.') != std::string::npos) ||
+                        (limits[1] != nullptr && limits[1]->text.find('.') != std::string::npos))) {
+                const FieldProperty* property =
+                    limits[0] != nullptr && limits[0]->text.find('.') != std::string::npos
+                        ? limits[0]
+                        : limits[1];
+                add_diagnostic(
+                    result,
+                    "SEM013",
+                    "integer field bounds must use whole-number values",
+                    property->span);
+            } else if (limits[0] != nullptr && limits[1] != nullptr && minimum > maximum) {
+                add_diagnostic(result, "SEM008", "minimum value must not exceed maximum value", limits[1]->span);
+            }
+        }
+
+        if (!has_length_limit) {
+            return;
+        }
+        if (field.type != FieldType::Textarea) {
+            const FieldProperty* property = limits[2] != nullptr ? limits[2] : limits[3];
+            add_diagnostic(
+                result,
+                "SEM009",
+                "length constraints require a textarea field",
+                property->span);
+            return;
+        }
+
+        unsigned long long minimum_length = 0;
+        unsigned long long maximum_length = 0;
+        if ((limits[2] != nullptr && !parse_length(limits[2]->text, minimum_length)) ||
+            (limits[3] != nullptr && !parse_length(limits[3]->text, maximum_length))) {
+            const FieldProperty* property =
+                limits[2] != nullptr && !parse_length(limits[2]->text, minimum_length)
+                    ? limits[2]
+                    : limits[3];
+            add_diagnostic(
+                result,
+                "SEM010",
+                "length constraints must be whole numbers within the supported range",
+                property->span);
+        } else if (limits[2] != nullptr && limits[3] != nullptr &&
+                   minimum_length > maximum_length) {
+            add_diagnostic(
+                result,
+                "SEM011",
+                "minimum length must not exceed maximum length",
+                limits[3]->span);
         }
     }
 
