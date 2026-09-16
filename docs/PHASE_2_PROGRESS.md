@@ -1,10 +1,10 @@
-# VISTA Phase 2 Implementation Progress
+# VISTA Compiler Implementation Progress
 
 Date: 16 September 2026
 
 ## Prototype status
 
-VISTA 0.6.0 is a working Phase 2 prototype. It compiles a `.vista` form specification through six implemented stages and generates a standalone HTML form only when every stage succeeds.
+VISTA 0.7.0 is a working compiler prototype. It compiles a `.vista` form specification through six implemented stages, validates editable field-value datasets in the CLI, and generates standalone HTML only when every compiler stage succeeds.
 
 ```text
 .vista source
@@ -24,11 +24,12 @@ VISTA 0.6.0 is a working Phase 2 prototype. It compiles a `.vista` form specific
 | Lexical analysis | Keywords, identifiers, literals, operators, punctuation, comments, positions, illegal characters, unterminated strings | `tokens.txt`, `LEX001`, `LEX002` |
 | Syntax analysis | Yacc-compatible Bison grammar, precedence, AST construction, detailed syntax errors, declaration recovery | `ast.txt`, `SYN001` |
 | Symbol table | Declaration-order insertion and lookup with field type, options, label, and source location | `symbols.txt` |
-| Semantic analysis | Duplicate fields, undefined names, incompatible types, invalid choices, Boolean conditions, missing labels, type-safe numeric and text-length constraints | `SEM001`-`SEM013` |
+| Semantic analysis | Duplicate fields/properties/options, undefined names, incompatible types, invalid choices, Boolean conditions, empty-form rejection, and type-safe numeric/date/text constraints | `SEM001`-`SEM017` |
 | Dependency analysis | Visibility and requirement edges, text table, DOT graph, self-dependencies, DFS cycle detection | `dependencies.txt`, `graph.dot`, `ANL001`, `ANL002` |
 | Witness analysis | Exhaustive Boolean/choice assignments and concrete hidden-required witnesses | `ANL003` |
 | Analysis boundary | Explicit refusal to overclaim unsupported numeric/date/text witness reasoning | `ANL900` |
 | HTML backend | Ten field types, labels, email/phone/textarea controls, numeric and text-length constraints, conditional behavior, check messages, embedded CSS/JavaScript, output escaping | `form.html` |
+| CLI data validator | Editable value files, field/type/format/constraint checks, conditional requirements, visibility-aware rules, readable PASS/FAIL reports | `--validate-data`, `samples/` |
 | Integrated pipeline | One command produces all seven evidence files; failed compilation preserves progressive results and removes stale HTML | `--emit all`, `tests/test_pipeline.sh` |
 
 ## Output bundle
@@ -72,6 +73,7 @@ produces:
 - the complete Scholarship template, including native email/phone/textarea controls, GPA and income bounds, statement length, declaration, and category certificate conditions;
 - stale-output cleanup and the guarantee that failed compilations have no `form.html`;
 - command-line and missing-file exit codes.
+- valid and invalid CLI datasets for all three templates, including conditional requirements, email/phone formats, signed bounds, dates, choices, and eligibility checks.
 
 The C++ source is also tested with AddressSanitizer and UndefinedBehaviorSanitizer. Flex and Bison generation uses strict warnings, and the project compiles with `-Wall -Wextra -Wpedantic -Werror`.
 
@@ -80,10 +82,10 @@ The C++ source is also tested with AddressSanitizer and UndefinedBehaviorSanitiz
 | Review criterion | Current evidence |
 |---|---|
 | Implementation progress | Six connected compiler stages and seven generated artifacts |
-| Functional correctness | Cumulative automated tests plus browser interaction testing |
+| Functional correctness | Cumulative compiler and CLI runtime validation tests |
 | Compiler-concept application | Flex, Bison, AST, symbol table, semantic checks, graph analysis, and code generation |
 | Code quality | Separate headers/sources, strict compiler warnings, deterministic outputs, stable diagnostics |
-| Testing | Valid, invalid, boundary, security-escaping, and fail-closed cases |
+| Testing | Valid, invalid, boundary, security-escaping, runtime-data, sanitizer, and fail-closed cases |
 | Problem solving | Contextual choice literals, cycle reconstruction, finite witness generation, stale-output prevention |
 | Innovation | Concrete witness assignment for a required-but-hidden form state |
 | Individual understanding | `DEMO_GUIDE.md` contains concise module and algorithm explanations |
@@ -99,6 +101,6 @@ The prototype deliberately does not claim:
 - a form-submission server, database, authentication, or persistence;
 - arbitrary user JavaScript;
 - a drag-and-drop editor or framework-based frontend;
-- final Phase 3 performance evaluation and complete final report.
+- final performance evaluation and complete final report.
 
-These items do not prevent the current Phase 2 compiler pipeline from being built, tested, and demonstrated end to end.
+These items do not prevent the current compiler and CLI validation pipeline from being built, tested, and demonstrated end to end.

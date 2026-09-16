@@ -6,7 +6,7 @@ VISTA will read a small declarative form specification, validate its structure a
 
 ## Current status
 
-Stages 1 through 6 are complete. VISTA has a repeatable WSL build, positioned Flex scanner, Yacc-compatible Bison parser, C++ AST, field symbol table, semantic analyser, dependency graph, finite witness analysis, and a standalone HTML backend. It also includes editable Scholarship, College Admission, and Event Registration starter forms.
+Stages 1 through 6 are complete. VISTA has a repeatable WSL build, positioned Flex scanner, Yacc-compatible Bison parser, C++ AST, field symbol table, semantic analyser, dependency graph, finite witness analysis, standalone HTML generation, and CLI runtime data validation. It includes editable Scholarship, College Admission, and Event Registration starter forms with valid and invalid sample datasets.
 
 ## Requirements
 
@@ -34,6 +34,8 @@ The executable is created at `build/vista`.
 ./build/vista --version
 ./build/vista --help
 ./build/vista --list-templates
+./build/vista templates/scholarship_application.vista --validate-data samples/scholarship-valid.data
+./build/vista templates/scholarship_application.vista --validate-data samples/scholarship-invalid.data
 ./build/vista examples/valid_scholarship.vista --emit tokens
 ./build/vista examples/valid_scholarship.vista --emit ast
 ./build/vista examples/valid_scholarship.vista --emit symbols
@@ -61,9 +63,23 @@ make demo
 
 Witness analysis exhaustively checks finite Boolean and choice assignments. Numeric, date, and text-dependent reasoning is deliberately reported as `ANL900` rather than approximated.
 
-HTML is generated only after every earlier compiler stage succeeds. The language supports text, email, phone, textarea, integer, decimal, Boolean, date, choice, and file controls. Numeric fields can declare `minimum` and `maximum`; textareas can declare `min_length` and `max_length`. The generated file contains accessible labels, native browser constraints, embedded conditional behavior, escaped author-provided text, and check-message validation without external libraries.
+`--validate-data` runs a compiled form against an editable `field = value` data file. It checks required and conditionally required fields, visibility, types, choices, email and phone formats, signed numeric and date bounds, text lengths, declarations, and form-level checks. It exits with `0` for a passing dataset, `1` for validation failure, and `2` for command or file errors.
 
-The fuller Phase 2 Scholarship form is an editable source file at `templates/scholarship_application.vista`. Compile it with the command above or run `make demo`; the generated page validates locally in the browser and does not submit or store applications.
+Example data syntax:
+
+```text
+full_name = "Maya Patel"
+email_address = maya.patel@example.com
+gpa = 8.4
+applicant_category = general
+declaration = true
+```
+
+Blank lines and lines beginning with `#` or `//` are ignored. Quote values that contain spaces. Choice values and Booleans use their declared names directly.
+
+HTML is generated only after every earlier compiler stage succeeds. The language supports text, email, phone, textarea, integer, decimal, Boolean, date, choice, and file controls. Numeric and date fields can declare `minimum` and `maximum`; textual fields can declare `min_length` and `max_length`. The generated file contains accessible labels, native browser constraints, embedded conditional behavior, escaped author-provided text, and visibility-aware check-message validation without external libraries.
+
+The Scholarship form is an editable source file at `templates/scholarship_application.vista`. Run `make demo` for a backend-only walkthrough containing a passing dataset, a failing dataset, and a static safety diagnostic.
 
 `./build/vista --list-templates` lists the three source paths and compile commands. The catalogue at [templates/README.md](templates/README.md) summarizes each form's purpose and fields. The College Admission form demonstrates a conditionally required “other program” field; Event Registration demonstrates workshop-track and in-person-only fields.
 
@@ -78,6 +94,7 @@ include/       C++ headers
 src/           C++ source files
 examples/      Valid and invalid VISTA inputs
 templates/     Editable Scholarship, College Admission, and Event Registration sources
+samples/       Editable valid and invalid CLI value datasets
 tests/         Cumulative end-to-end tests
 build/         Generated executable, not committed
 Makefile       WSL build, test, and demo commands
@@ -87,5 +104,5 @@ README.md      Setup and current progress
 ## Exit codes
 
 - `0`: command completed successfully
-- `1`: the source contains a lexical, syntax, semantic, or analysis error
+- `1`: the source contains a compiler error, or supplied field values fail validation
 - `2`: invalid command-line usage

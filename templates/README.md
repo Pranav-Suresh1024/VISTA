@@ -2,7 +2,15 @@
 
 These editable `.vista` files demonstrate domain-specific forms using the same VISTA compiler. Compile a template from the repository root with the command shown below. Each `--emit all` command writes the seven-file compiler evidence bundle, including a standalone `form.html`.
 
-The generated pages validate fields in the browser only. They do not submit applications, reserve places, upload documents to a server, or store personal information.
+Validation runs locally in the CLI or generated page. VISTA does not submit applications, reserve places, upload documents to a server, or store personal information.
+
+VISTA can also validate sample field values entirely in the terminal. The editable datasets are in `samples/`:
+
+```bash
+./build/vista templates/scholarship_application.vista --validate-data samples/scholarship-valid.data
+./build/vista templates/college_admission.vista --validate-data samples/college-valid.data
+./build/vista templates/event_registration.vista --validate-data samples/event-valid.data
+```
 
 ## Scholarship
 

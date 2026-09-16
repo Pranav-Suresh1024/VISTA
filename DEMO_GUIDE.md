@@ -1,183 +1,154 @@
-# VISTA Public-Service Template Catalogue Demonstration Guide
+# VISTA Backend-Only Demonstration Guide
 
-This guide presents the current working prototype in about five minutes.
+This walkthrough demonstrates the compiler and runtime validator entirely in Ubuntu/WSL. No browser is required.
 
-## Before the review
+## 1. Open the correct terminal and build
 
-Open Ubuntu WSL and run:
+Run in Ubuntu/WSL:
 
 ```bash
 cd "/mnt/c/Users/prana/OneDrive/Documents/ChatGPT/Compiler Design"
 make all
 make test
-make demo
 ```
 
-The final test line must be:
+The final line should be:
 
 ```text
-Complete Phase 2 pipeline and failure-path tests passed.
+Complete VISTA compiler and validation pipeline tests passed.
 ```
 
-The three complete evidence bundles will be in `out/phase3-templates/`.
-
-## 1. Introduce the project
+## 2. Introduce the compiler
 
 Say:
 
-> VISTA is a small source-to-source compiler. It reads a declarative form specification, performs lexical, syntax, semantic, and conditional-rule analysis, and generates a standalone HTML form only when the specification is safe.
+> VISTA compiles a declarative form specification through lexical, syntax, semantic, dependency, and safety analysis. It can then validate teacher-editable input datasets directly in the CLI.
 
-List the starter sources:
+Show the available templates:
 
 ```bash
+./build/vista --version
 ./build/vista --list-templates
 ```
 
-The list points to ordinary editable `.vista` source files. The concise catalogue is in `templates/README.md`.
-
-Show one source:
+## 3. Show the source input
 
 ```bash
-sed -n '1,180p' templates/college_admission.vista
+sed -n '1,220p' templates/scholarship_application.vista
 ```
 
-Explain that the input is a `.vista` source file, not an interactive prompt.
+Point out field types, numeric and date bounds, length limits, conditional fields, and `check` rules.
 
-## 2. Show incremental development and tests
+## 4. Show compiler stages
 
 ```bash
-git log --oneline --reverse
-make test
+./build/vista templates/scholarship_application.vista --emit tokens | head -25
+./build/vista templates/scholarship_application.vista --emit ast | head -60
+./build/vista templates/scholarship_application.vista --emit symbols
+./build/vista templates/scholarship_application.vista --emit dependencies
+./build/vista templates/scholarship_application.vista --emit diagnostics
 ```
 
-Point out that each compiler module was added as a focused commit and every test suite passes cumulatively.
+The final command should print `No diagnostics.`
 
-## 3. Compile all three starter forms
+## 5. Validate a passing dataset
+
+First show the editable values:
+
+```bash
+cat samples/scholarship-valid.data
+```
+
+Then validate them:
 
 ```bash
 ./build/vista templates/scholarship_application.vista \
-  --emit all \
-  --out-dir out/phase3-templates/scholarship
-./build/vista templates/college_admission.vista \
-  --emit all \
-  --out-dir out/phase3-templates/college-admission
-./build/vista templates/event_registration.vista \
-  --emit all \
-  --out-dir out/phase3-templates/event-registration
+  --validate-data samples/scholarship-valid.data
 ```
 
-Each command should print its generated output directory. Each folder contains:
+Expected result:
 
 ```text
-ast.txt
-dependencies.txt
-diagnostics.txt
-form.html
-graph.dot
-symbols.txt
-tokens.txt
+Result          : PASS
+
+No validation errors.
 ```
 
-## 4. Explain the template-specific rules
-
-- Scholarship: choosing `reserved` displays a required category certificate.
-- College Admission: choosing `other` reveals a required program-name field.
-- Event Registration: choosing `workshop` reveals a required track; dietary requirements appear only for in-person attendance.
-
-These are demonstrations of VISTA conditions and validation, not real application or reservation services.
-
-## 5. Explain intermediate compiler results
+## 6. Validate deliberately incorrect values
 
 ```bash
-sed -n '1,18p' out/phase3-templates/college-admission/tokens.txt
-sed -n '1,40p' out/phase3-templates/college-admission/ast.txt
-cat out/phase3-templates/college-admission/symbols.txt
-cat out/phase3-templates/college-admission/dependencies.txt
-cat out/phase3-templates/college-admission/diagnostics.txt
+cat samples/scholarship-invalid.data
+./build/vista templates/scholarship_application.vista \
+  --validate-data samples/scholarship-invalid.data
 ```
 
-Use these explanations:
+Exit status `1` is expected. The report demonstrates invalid email and phone values, name and statement lengths, date and GPA bounds, missing conditionally required documents, and a false declaration.
 
-- `tokens.txt`: Flex identifies tokens and records line and column positions.
-- `ast.txt`: Bison validates the grammar and constructs the abstract syntax tree.
-- `symbols.txt`: The semantic pass stores each field's name, type, choices, label, and location.
-- `dependencies.txt`: Conditional references become directed dependency edges.
-- `diagnostics.txt`: A valid form reports `No diagnostics.`
-- `graph.dot`: The same dependency information is available in Graphviz DOT format.
-
-## 6. Demonstrate the generated forms
-
-Open each `form.html` from `out/phase3-templates/` in a browser.
-
-1. Scholarship: toggle `general` and `reserved` to see the conditional certificate.
-2. College Admission: choose `other` to show and require the program-name field.
-3. Event Registration: choose `workshop`, then toggle `in_person` and `online` to inspect the conditional fields.
-4. Try a malformed email, out-of-range score/count, or missing required field to see browser validation.
-5. Each form is self-contained HTML and performs browser-side validation only; nothing is transmitted or persisted.
-
-Explain that the HTML, CSS, and restricted validation JavaScript are embedded in one file and use no external framework. This is a browser-side demonstration; it does not upload files, submit applications, or store personal information.
-
-## 7. Demonstrate the novelty feature
+For values that have valid types but fail eligibility rules:
 
 ```bash
-./build/vista examples/hidden_required.vista \
-  --emit all \
-  --out-dir out/hidden-required
+./build/vista templates/scholarship_application.vista \
+  --validate-data samples/scholarship-ineligible.data
+```
+
+This reports the GPA and household-income eligibility messages.
+
+## 7. Let the teacher change input
+
+Preserve the supplied example by making a demo copy:
+
+```bash
+mkdir -p out/cli-demo
+cp samples/scholarship-valid.data out/cli-demo/teacher-values.data
+nano out/cli-demo/teacher-values.data
+```
+
+Suggested changes:
+
+- Change `gpa = 8.4` to `gpa = 5.5`.
+- Change `applicant_category = general` to `applicant_category = reserved` without adding `category_certificate`.
+- Change the email to `invalid-email`.
+
+Save with Ctrl+O, Enter, then exit with Ctrl+X. Validate the changed file:
+
+```bash
+./build/vista templates/scholarship_application.vista \
+  --validate-data out/cli-demo/teacher-values.data
+```
+
+Restore individual values in the same file and rerun the command until it passes.
+
+## 8. Show other working domains
+
+```bash
+./build/vista templates/college_admission.vista \
+  --validate-data samples/college-valid.data
+./build/vista templates/event_registration.vista \
+  --validate-data samples/event-valid.data
+```
+
+Both should report `PASS`. Their `*-invalid.data` counterparts demonstrate program, qualification, workshop, attendance-mode, guest, and capacity rules.
+
+## 9. Demonstrate compile-time safety analysis
+
+```bash
+./build/vista examples/hidden_required.vista --emit diagnostics
 ```
 
 Expected diagnostic:
 
 ```text
-ANL003: field 'certificate' can be required while hidden; witness: category=general, certificate.visible=false, certificate.required=true
+ANL003: field 'certificate' can be required while hidden
 ```
 
-Then run:
+Explain that this is different from invalid applicant data: VISTA has detected an unsafe form definition before runtime.
+
+## One-command fallback
+
+If review time is short:
 
 ```bash
-ls -1 out/hidden-required
-cat out/hidden-required/diagnostics.txt
+make demo
 ```
 
-Point out that `form.html` is absent. VISTA fails closed and gives a concrete assignment that reproduces the problem.
-
-## 8. Briefly show other error levels
-
-```bash
-./build/vista examples/lexical_error.vista --emit diagnostics
-./build/vista examples/syntax_error.vista --emit diagnostics
-./build/vista examples/type_mismatch.vista --emit diagnostics
-./build/vista examples/dependency_cycle.vista --emit diagnostics
-```
-
-The stable prefixes identify the compiler stage:
-
-- `LEX`: lexical analysis
-- `SYN`: syntax analysis
-- `SEM`: semantic analysis
-- `ANL`: dependency and witness analysis
-
-## Likely viva questions
-
-### Why use Flex and Bison?
-
-Flex converts source characters into positioned tokens. Bison checks those tokens against the VISTA grammar and constructs the AST.
-
-### Why is a symbol table required?
-
-It resolves field references and stores type, choice-option, label, and source-location information for semantic checking.
-
-### How are dependency cycles found?
-
-Each conditional field reference becomes a directed edge. A depth-first search reports a cycle when it reaches a node already on the active DFS path.
-
-### How is a hidden-required witness produced?
-
-For Boolean and choice fields, VISTA enumerates their finite values. It evaluates visibility and requirement conditions and reports an assignment where `required` is true while `visible` is false.
-
-### Why does `ANL900` exist?
-
-The current prototype does not pretend to prove numeric, date, or text-dependent conditions. It reports the limitation explicitly so unsafe HTML is not generated.
-
-### Is this the final complete project?
-
-No. It is a working compiler prototype with three public-service form examples. It does not provide a backend for submitting or storing forms, nor a graphical template gallery or visual builder.
+It lists the templates, compiles the Scholarship definition, validates one passing and one failing dataset, and shows the hidden-required safety diagnostic.
