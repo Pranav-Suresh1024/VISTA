@@ -1,0 +1,67 @@
+form ScholarshipApplication {
+  title "Scholarship Application"
+  description "A starter application for scholarship consideration. This demo does not submit an application or store personal information."
+
+  field applicantName: text {
+    label "Applicant name"
+    section "Applicant details"
+    help "Enter your name as it appears on official documents."
+    placeholder "e.g. Maya Patel"
+    required
+  }
+
+  field emailAddress: text {
+    label "Email address"
+    section "Applicant details"
+    help "Use an address where you can receive application updates."
+    placeholder "you@example.com"
+    required
+  }
+
+  field institution: text {
+    label "Institution"
+    section "Study information"
+    placeholder "School, college, or university"
+    required
+  }
+
+  field course: choice { arts, science, commerce, engineering, other } {
+    label "Course or area of study"
+    section "Study information"
+    placeholder "Choose an area of study"
+    required
+  }
+
+  field studyYear: choice { first, second, third, fourth, postgraduate } {
+    label "Current year of study"
+    section "Study information"
+    placeholder "Choose your current year"
+    required
+  }
+
+  field familyIncome: decimal {
+    label "Annual family income"
+    section "Study information"
+    help "Enter a non-negative amount in your local currency."
+    placeholder "e.g. 25000.00"
+    required
+  }
+
+  field applicantCategory: choice { general, reserved } {
+    label "Applicant category"
+    section "Supporting documents"
+    placeholder "Choose a category"
+    required
+  }
+
+  field categoryCertificate: file {
+    label "Category certificate"
+    section "Supporting documents"
+    help "Required only for applicants selecting the reserved category."
+    show when applicantCategory == reserved
+    required when applicantCategory == reserved
+  }
+
+  check applicantName != "" message "Enter the applicant name"
+  check familyIncome >= 0.0 message "Family income cannot be negative"
+}

@@ -42,9 +42,15 @@ The executable is created at `build/vista`.
 ./build/vista examples/hidden_required.vista --emit diagnostics
 ./build/vista examples/valid_scholarship.vista --emit html --out-dir out/scholarship
 ./build/vista examples/valid_scholarship.vista --emit all --out-dir out/demo
+./build/vista --list-templates
+./build/vista --template scholarship --emit all --out-dir out/scholarship-template
 ```
 
 The token table contains each token's source location, classification, and original lexeme. Whitespace and `//` comments are ignored while their positions are still counted.
+
+## Starter form templates
+
+VISTA includes sample [scholarship, train-booking, and event-registration templates](templates/README.md). Compile the template source you want with the normal CLI command, or pass your own `.vista` source file. All templates are illustrative demos and do not submit data or connect to external services.
 
 ## Verify the completed stages
 
@@ -68,6 +74,7 @@ For the review walkthrough and current implementation evidence, see [DEMO_GUIDE.
 ```text
 include/       C++ headers
 src/           C++ source files
+templates/     Starter .vista form templates
 examples/      Valid and invalid VISTA inputs
 tests/         Cumulative end-to-end tests
 build/         Generated executable, not committed

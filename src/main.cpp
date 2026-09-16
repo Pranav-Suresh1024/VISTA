@@ -18,10 +18,41 @@
 
 namespace {
 
+struct StarterTemplate {
+    const char* id;
+    const char* title;
+    const char* source_path;
+};
+
+constexpr StarterTemplate kStarterTemplates[]{
+    {"scholarship", "Scholarship Application", "templates/scholarship_application.vista"},
+    {"train-booking", "Train Ticket Booking", "templates/train_booking.vista"},
+    {"event-registration", "Event Registration", "templates/event_registration.vista"}
+};
+
+const StarterTemplate* find_template(const std::string& id) {
+    for (const StarterTemplate& starter_template : kStarterTemplates) {
+        if (id == starter_template.id) {
+            return &starter_template;
+        }
+    }
+    return nullptr;
+}
+
+void print_templates(std::ostream& output) {
+    output << "Available VISTA starter templates:\n";
+    for (const StarterTemplate& starter_template : kStarterTemplates) {
+        output << "  " << starter_template.id << " - " << starter_template.title
+               << " (" << starter_template.source_path << ")\n";
+    }
+}
+
 void print_help(std::ostream& output) {
     output << "VISTA - Validation and Interface Specification Translation Analyzer\n\n"
            << "Usage: vista <source.vista> --emit <tokens|ast|symbols|dependencies|graph|diagnostics>\n"
            << "       vista <source.vista> --emit <html|all> --out-dir <directory>\n"
+           << "       vista --template <id> --emit <mode> [--out-dir <directory>]\n"
+           << "       vista --list-templates\n"
            << "       vista [option]\n\n"
            << "Options:\n"
            << "  --help       Show this help message\n"
@@ -33,7 +64,9 @@ void print_help(std::ostream& output) {
            << "  --emit graph   Print the dependency graph in DOT format\n"
            << "  --emit diagnostics  Run semantic and dependency analysis\n"
            << "  --emit html --out-dir DIR  Generate a standalone HTML form\n"
-           << "  --emit all --out-dir DIR   Write every demonstration artifact\n";
+           << "  --emit all --out-dir DIR   Write every demonstration artifact\n"
+           << "  --list-templates           List the built-in starter templates\n"
+           << "  --template ID              Compile a starter template by ID\n";
 }
 
 std::string format_tokens(const std::vector<vista::Token>& tokens) {
@@ -150,7 +183,7 @@ int main(int argc, char* argv[]) {
         return 0;
     }
 
-    const std::string source_path = argv[1];
+    std::string source_path = argv[1];
     if (source_path == "--help") {
         print_help(std::cout);
         return 0;
@@ -160,13 +193,41 @@ int main(int argc, char* argv[]) {
         return 0;
     }
 
-    if ((argc != 4 && argc != 6) || std::string(argv[2]) != "--emit") {
+    if (source_path == "--list-templates") {
+        if (argc != 2) {
+            std::cerr << "VISTA: invalid command-line arguments\n"
+                      << "Run 'vista --help' to see the available options.\n";
+            return 2;
+        }
+        print_templates(std::cout);
+        return 0;
+    }
+
+    int emit_flag_index = 2;
+    if (source_path == "--template") {
+        if (argc < 3) {
+            std::cerr << "VISTA: missing template ID\n"
+                      << "Run 'vista --list-templates' to see available templates.\n";
+            return 2;
+        }
+        const StarterTemplate* starter_template = find_template(argv[2]);
+        if (starter_template == nullptr) {
+            std::cerr << "VISTA: unknown template ID '" << argv[2] << "'\n"
+                      << "Run 'vista --list-templates' to see available templates.\n";
+            return 2;
+        }
+        source_path = starter_template->source_path;
+        emit_flag_index = 3;
+    }
+
+    if ((argc != emit_flag_index + 2 && argc != emit_flag_index + 4) ||
+        std::string(argv[emit_flag_index]) != "--emit") {
         std::cerr << "VISTA: invalid command-line arguments\n"
                   << "Run 'vista --help' to see the available options.\n";
         return 2;
     }
 
-    const std::string emit_mode = argv[3];
+    const std::string emit_mode = argv[emit_flag_index + 1];
     const bool directory_mode = emit_mode == "html" || emit_mode == "all";
     const bool known_mode =
         emit_mode == "tokens" || emit_mode == "ast" || emit_mode == "symbols" ||
@@ -177,9 +238,10 @@ int main(int argc, char* argv[]) {
         return 2;
     }
     if ((directory_mode &&
-         (argc != 6 || std::string(argv[4]) != "--out-dir" ||
-          std::string(argv[5]).empty())) ||
-        (!directory_mode && argc != 4)) {
+         (argc != emit_flag_index + 4 ||
+          std::string(argv[emit_flag_index + 2]) != "--out-dir" ||
+          std::string(argv[emit_flag_index + 3]).empty())) ||
+        (!directory_mode && argc != emit_flag_index + 2)) {
         std::cerr << "VISTA: invalid command-line arguments\n"
                   << "Run 'vista --help' to see the available options.\n";
         return 2;
@@ -192,7 +254,8 @@ int main(int argc, char* argv[]) {
     }
 
     const bool all_mode = emit_mode == "all";
-    const std::filesystem::path output_directory = directory_mode ? argv[5] : "";
+    const std::filesystem::path output_directory =
+        directory_mode ? argv[emit_flag_index + 3] : "";
     if (directory_mode) {
         if (!prepare_output_directory(output_directory) ||
             !clear_generated_artifacts(output_directory, all_mode)) {
