@@ -22,10 +22,12 @@ void print_help(std::ostream& output) {
     output << "VISTA - Validation and Interface Specification Translation Analyzer\n\n"
            << "Usage: vista <source.vista> --emit <tokens|ast|symbols|dependencies|graph|diagnostics>\n"
            << "       vista <source.vista> --emit <html|all> --out-dir <directory>\n"
+           << "       vista --list-templates\n"
            << "       vista [option]\n\n"
            << "Options:\n"
            << "  --help       Show this help message\n"
            << "  --version    Show the current VISTA version\n"
+           << "  --list-templates  List editable starter form sources and compile commands\n"
            << "  --emit tokens  Print the positioned Flex token stream\n"
            << "  --emit ast     Parse the source and print its abstract syntax tree\n"
            << "  --emit symbols Print the field symbol table\n"
@@ -34,6 +36,32 @@ void print_help(std::ostream& output) {
            << "  --emit diagnostics  Run semantic and dependency analysis\n"
            << "  --emit html --out-dir DIR  Generate a standalone HTML form\n"
            << "  --emit all --out-dir DIR   Write every demonstration artifact\n";
+}
+
+struct StarterTemplate {
+    const char* id;
+    const char* source_path;
+    const char* output_directory;
+};
+
+const std::vector<StarterTemplate>& starter_templates() {
+    static const std::vector<StarterTemplate> templates{
+        {"scholarship", "templates/scholarship_application.vista", "out/phase3-templates/scholarship"},
+        {"college-admission", "templates/college_admission.vista", "out/phase3-templates/college-admission"},
+        {"event-registration", "templates/event_registration.vista", "out/phase3-templates/event-registration"}
+    };
+    return templates;
+}
+
+void print_templates(std::ostream& output) {
+    output << "Available starter templates (editable VISTA source files):\n";
+    for (const StarterTemplate& form_template : starter_templates()) {
+        output << "  " << form_template.id << "\n"
+               << "    Source: " << form_template.source_path << "\n"
+               << "    Compile: ./build/vista " << form_template.source_path
+               << " --emit all --out-dir " << form_template.output_directory << "\n";
+    }
+    output << "These examples validate in the browser only; they do not submit or store forms.\n";
 }
 
 std::string format_tokens(const std::vector<vista::Token>& tokens) {
@@ -157,6 +185,14 @@ int main(int argc, char* argv[]) {
     }
     if (source_path == "--version") {
         std::cout << vista::kProgramName << ' ' << vista::kVersion << '\n';
+        return 0;
+    }
+    if (source_path == "--list-templates") {
+        if (argc != 2) {
+            std::cerr << "VISTA: --list-templates does not accept additional arguments\n";
+            return 2;
+        }
+        print_templates(std::cout);
         return 0;
     }
 

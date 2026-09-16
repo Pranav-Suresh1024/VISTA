@@ -1,0 +1,100 @@
+form CollegeAdmission {
+  title "College Admission Application"
+  description "Share your contact, education, and program details. This demonstration validates locally and does not send an application to a college."
+
+  field applicant_name: text {
+    label "Full legal name"
+    section "Applicant details"
+    placeholder "Name on official documents"
+    required
+  }
+
+  field email_address: email {
+    label "Email address"
+    section "Applicant details"
+    placeholder "you@example.com"
+    required
+  }
+
+  field phone_number: phone {
+    label "Phone number"
+    section "Applicant details"
+    placeholder "+91 98765 43210"
+    required
+  }
+
+  field date_of_birth: date {
+    label "Date of birth"
+    section "Applicant details"
+    required
+  }
+
+  field previous_institution: text {
+    label "Most recent institution"
+    section "Previous education"
+    required
+  }
+
+  field qualification: choice { higher_secondary, diploma, undergraduate, postgraduate, other } {
+    label "Highest completed qualification"
+    section "Previous education"
+    placeholder "Choose a qualification"
+    required
+  }
+
+  field graduation_year: integer {
+    label "Year completed"
+    section "Previous education"
+    minimum 2000
+    maximum 2035
+    required
+  }
+
+  field previous_score: decimal {
+    label "Final score or percentage"
+    section "Previous education"
+    help "Enter a percentage between 0 and 100."
+    minimum 0
+    maximum 100
+    required
+  }
+
+  field program: choice { business, computer_science, design, engineering, science, other } {
+    label "Program applied for"
+    section "Program selection"
+    placeholder "Choose a program"
+    required
+  }
+
+  field other_program: text {
+    label "Program name"
+    section "Program selection"
+    placeholder "Enter the program you are interested in"
+    show when program == other
+    required when program == other
+  }
+
+  field transcript: file {
+    label "Academic transcript"
+    section "Documents and declaration"
+    help "Select a local sample file to demonstrate the document control."
+    required
+  }
+
+  field applicant_statement: textarea {
+    label "Why are you applying to this program?"
+    section "Documents and declaration"
+    min_length 40
+    max_length 1200
+    required
+  }
+
+  field declaration: boolean {
+    label "I confirm that the information above is accurate."
+    section "Documents and declaration"
+    required
+  }
+
+  check previous_score >= 0 and previous_score <= 100 message "Final score must be between 0 and 100"
+  check declaration == true message "Confirm the declaration before continuing"
+}

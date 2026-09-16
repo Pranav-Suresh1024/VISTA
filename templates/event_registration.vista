@@ -1,0 +1,78 @@
+form EventRegistration {
+  title "Event Registration"
+  description "Prepare a sample event registration. This form demonstrates local validation only; it does not reserve a place or collect payment."
+
+  field attendee_name: text {
+    label "Attendee name"
+    section "Attendee details"
+    placeholder "Full name"
+    required
+  }
+
+  field email_address: email {
+    label "Email address"
+    section "Attendee details"
+    placeholder "you@example.com"
+    required
+  }
+
+  field phone_number: phone {
+    label "Phone number"
+    section "Attendee details"
+    placeholder "+91 98765 43210"
+  }
+
+  field event: choice { career_fair, seminar, workshop, community_day } {
+    label "Event"
+    section "Registration choices"
+    placeholder "Choose an event"
+    required
+  }
+
+  field attendance_mode: choice { in_person, online } {
+    label "How will you attend?"
+    section "Registration choices"
+    placeholder "Choose attendance mode"
+    required
+  }
+
+  field attendee_count: integer {
+    label "Number of attendees"
+    section "Registration choices"
+    help "Enter a number from 1 to 4 for this demonstration."
+    minimum 1
+    maximum 4
+    required
+  }
+
+  field workshop_track: choice { web_development, data_science, career_planning } {
+    label "Workshop track"
+    section "Optional details"
+    placeholder "Choose a workshop track"
+    show when event == workshop
+    required when event == workshop
+  }
+
+  field meal_requirements: textarea {
+    label "Dietary requirements"
+    section "Optional details"
+    help "Visible for in-person attendance; do not enter sensitive health details."
+    placeholder "Optional"
+    max_length 300
+    show when attendance_mode == in_person
+  }
+
+  field accessibility_support: boolean {
+    label "I would like the organizer to contact me about accessibility support."
+    section "Optional details"
+  }
+
+  field declaration: boolean {
+    label "I confirm these registration details are correct."
+    section "Confirmation"
+    required
+  }
+
+  check attendee_count >= 1 and attendee_count <= 4 message "Enter between 1 and 4 attendees"
+  check declaration == true message "Confirm the registration details before continuing"
+}

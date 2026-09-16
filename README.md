@@ -6,7 +6,7 @@ VISTA will read a small declarative form specification, validate its structure a
 
 ## Current status
 
-Stages 1 through 6 are complete. VISTA now has a repeatable WSL build, positioned Flex scanner, Yacc-compatible Bison parser, C++ AST, field symbol table, semantic analyser, dependency graph, finite witness analysis, and a standalone HTML backend.
+Stages 1 through 6 are complete. VISTA has a repeatable WSL build, positioned Flex scanner, Yacc-compatible Bison parser, C++ AST, field symbol table, semantic analyser, dependency graph, finite witness analysis, and a standalone HTML backend. It also includes editable Scholarship, College Admission, and Event Registration starter forms.
 
 ## Requirements
 
@@ -33,6 +33,7 @@ The executable is created at `build/vista`.
 ```bash
 ./build/vista --version
 ./build/vista --help
+./build/vista --list-templates
 ./build/vista examples/valid_scholarship.vista --emit tokens
 ./build/vista examples/valid_scholarship.vista --emit ast
 ./build/vista examples/valid_scholarship.vista --emit symbols
@@ -43,6 +44,8 @@ The executable is created at `build/vista`.
 ./build/vista examples/valid_scholarship.vista --emit html --out-dir out/scholarship
 ./build/vista examples/valid_scholarship.vista --emit all --out-dir out/demo
 ./build/vista templates/scholarship_application.vista --emit all --out-dir out/scholarship-demo
+./build/vista templates/college_admission.vista --emit all --out-dir out/college-admission-demo
+./build/vista templates/event_registration.vista --emit all --out-dir out/event-registration-demo
 ```
 
 The token table contains each token's source location, classification, and original lexeme. Whitespace and `//` comments are ignored while their positions are still counted.
@@ -62,6 +65,8 @@ HTML is generated only after every earlier compiler stage succeeds. The language
 
 The fuller Phase 2 Scholarship form is an editable source file at `templates/scholarship_application.vista`. Compile it with the command above or run `make demo`; the generated page validates locally in the browser and does not submit or store applications.
 
+`./build/vista --list-templates` lists the three source paths and compile commands. The catalogue at [templates/README.md](templates/README.md) summarizes each form's purpose and fields. The College Admission form demonstrates a conditionally required “other program” field; Event Registration demonstrates workshop-track and in-person-only fields.
+
 `--emit all` is the recommended demonstration command. It writes `tokens.txt`, `ast.txt`, `symbols.txt`, `dependencies.txt`, `graph.dot`, `diagnostics.txt`, and `form.html` into one output directory. Failed compilations write the intermediate results reached and `diagnostics.txt`, but never generate `form.html`.
 
 For the review walkthrough and current implementation evidence, see [DEMO_GUIDE.md](DEMO_GUIDE.md) and [docs/PHASE_2_PROGRESS.md](docs/PHASE_2_PROGRESS.md).
@@ -72,7 +77,7 @@ For the review walkthrough and current implementation evidence, see [DEMO_GUIDE.
 include/       C++ headers
 src/           C++ source files
 examples/      Valid and invalid VISTA inputs
-templates/     The Phase 2 Scholarship application source
+templates/     Editable Scholarship, College Admission, and Event Registration sources
 tests/         Cumulative end-to-end tests
 build/         Generated executable, not committed
 Makefile       WSL build, test, and demo commands

@@ -36,15 +36,20 @@ test: $(TARGET)
 	@bash tests/test_analysis.sh
 	@bash tests/test_codegen.sh
 	@bash tests/test_phase2.sh
+	@bash tests/test_templates.sh
 	@bash tests/test_pipeline.sh
 
 demo: $(TARGET)
-	@echo "VISTA Phase 2 scholarship form demonstration"
+	@echo "VISTA public-service template catalogue demonstration"
 	@echo
 	@./$(TARGET) --version
 	@echo
-	@./$(TARGET) templates/scholarship_application.vista --emit all --out-dir out/phase2-scholarship
-	@echo "Open out/phase2-scholarship/form.html in a browser."
+	@./$(TARGET) --list-templates
+	@echo
+	@./$(TARGET) templates/scholarship_application.vista --emit all --out-dir out/phase3-templates/scholarship
+	@./$(TARGET) templates/college_admission.vista --emit all --out-dir out/phase3-templates/college-admission
+	@./$(TARGET) templates/event_registration.vista --emit all --out-dir out/phase3-templates/event-registration
+	@echo "Open each out/phase3-templates/*/form.html in a browser."
 	@echo
 	@./$(TARGET) examples/hidden_required.vista --emit diagnostics || true
 
