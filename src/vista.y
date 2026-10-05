@@ -652,6 +652,46 @@ identifier:
     {
         $$ = $1;
     }
+  | MODULE
+    {
+        $$ = new std::string("module");
+    }
+  | IMPORT
+    {
+        $$ = new std::string("import");
+    }
+  | EXPORT
+    {
+        $$ = new std::string("export");
+    }
+  | ENTER
+    {
+        $$ = new std::string("enter");
+    }
+  | WORKFLOW
+    {
+        $$ = new std::string("workflow");
+    }
+  | USE
+    {
+        $$ = new std::string("use");
+    }
+  | AS
+    {
+        $$ = new std::string("as");
+    }
+  | START
+    {
+        $$ = new std::string("start");
+    }
+  | ROUTE
+    {
+        $$ = new std::string("route");
+    }
+  | PRESENT
+    {
+        $$ = new std::string("present");
+    }
 ;
 
 %%

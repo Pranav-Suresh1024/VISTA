@@ -3,6 +3,8 @@ set -u
 
 binary="./build/vista"
 failures=0
+temp_dir="$(mktemp -d)"
+trap 'rm -rf -- "$temp_dir"' EXIT
 
 expect_contains() {
     local text="$1"
@@ -52,6 +54,23 @@ if [[ $extended_status -ne 0 ]]; then
     failures=$((failures + 1))
 fi
 
+cat >"$temp_dir/file-presence.vista" <<'EOF'
+form FilePresence {
+  field attachment: file {
+    label "Attachment"
+  }
+  check present(attachment) message "Attach a file"
+}
+EOF
+file_presence_output="$($binary "$temp_dir/file-presence.vista" --emit diagnostics 2>&1)"
+file_presence_status=$?
+if [[ $file_presence_status -ne 0 ]]; then
+    echo "FAIL: present(file) returned $file_presence_status"
+    echo "$file_presence_output"
+    failures=$((failures + 1))
+fi
+expect_contains "$file_presence_output" "No diagnostics." "present(file) boolean result"
+
 collision_output="$($binary examples/choice_field_collision.vista --emit diagnostics 2>&1)"
 collision_status=$?
 if [[ $collision_status -ne 0 ]]; then
@@ -92,6 +111,17 @@ check_failure examples/decimal_text_length.vista SEM010 "length constraints must
 check_failure examples/duplicate_choice_option.vista SEM014 "repeats option 'general'"
 check_failure examples/duplicate_property.vista SEM015 "declares 'label' more than once"
 check_failure examples/empty_form.vista SEM016 "form must declare at least one field"
+
+cat >"$temp_dir/non-file-presence.vista" <<'EOF'
+form NonFilePresence {
+  field name: text {
+    label "Name"
+  }
+  check present(name) message "Enter a name"
+}
+EOF
+check_failure "$temp_dir/non-file-presence.vista" SEM003 \
+    "operator 'present' requires a file operand, but found text"
 
 if [[ $failures -ne 0 ]]; then
     echo "$failures Stage 4 test(s) failed."

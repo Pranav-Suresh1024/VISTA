@@ -80,8 +80,33 @@ workflow DuplicateStart {
   start Applicant
 }
 EOF
+cat >"$temp_dir/legacy-keyword-identifiers.vista" <<'EOF'
+form module {
+  field route: choice { module, import, export, enter, workflow, use, as, start, route, present } {
+    label "Keyword choice"
+  }
+  field present: text {
+    label "Keyword field"
+  }
+  check route == module message "Select module"
+  check present != "" message "Enter present"
+}
+EOF
 expect_failure "$temp_dir/duplicate-enter.vista" "SYN002"
 expect_failure "$temp_dir/duplicate-start.vista" "SYN002"
+expect_ast "$temp_dir/legacy-keyword-identifiers.vista" \
+    "Form module" \
+    "Field route : choice [module, import, export, enter, workflow, use, as, start, route, present]" \
+    "Field present : text" \
+    "Name present"
+legacy_compile_output="$($binary "$temp_dir/legacy-keyword-identifiers.vista" --emit diagnostics 2>&1)"
+legacy_compile_status=$?
+if [[ $legacy_compile_status -ne 0 ]]; then
+    echo "FAIL: legacy keyword identifiers did not compile"
+    echo "$legacy_compile_output"
+    failures=$((failures + 1))
+fi
+expect_contains "$legacy_compile_output" "No diagnostics." "legacy keyword identifiers compile"
 
 baseline_ast="$($binary examples/valid_scholarship.vista --emit ast 2>&1)"
 baseline_status=$?

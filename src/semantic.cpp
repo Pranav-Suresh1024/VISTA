@@ -538,6 +538,18 @@ private:
                 if (operand.type == ValueType::Error) {
                     return remember(expression, {ValueType::Error, "", false});
                 }
+                if (expression->value == "present") {
+                    if (operand.type != ValueType::File) {
+                        add_diagnostic(
+                            result,
+                            "SEM003",
+                            "operator 'present' requires a file operand, but found " +
+                                value_type_name(operand.type),
+                            expression->span);
+                        return remember(expression, {ValueType::Error, "", false});
+                    }
+                    return remember(expression, {ValueType::Boolean, "", false});
+                }
                 if (operand.type != ValueType::Boolean) {
                     add_diagnostic(
                         result,
