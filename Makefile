@@ -9,10 +9,10 @@ TARGET := build/vista
 GENERATED_SCANNER := build/vista_lexer.cpp
 GENERATED_PARSER := build/vista_parser.cpp
 GENERATED_PARSER_HEADER := build/vista_parser.hpp
-SOURCES := src/main.cpp src/analysis.cpp src/ast.cpp src/codegen.cpp src/diagnostic.cpp src/parser.cpp src/semantic.cpp src/token.cpp src/validation.cpp
-HEADERS := include/analysis.hpp include/ast.hpp include/codegen.hpp include/diagnostic.hpp include/parser.hpp include/scanner.hpp include/semantic.hpp include/token.hpp include/validation.hpp include/version.hpp
+SOURCES := src/main.cpp src/analysis.cpp src/ast.cpp src/codegen.cpp src/diagnostic.cpp src/hash.cpp src/module.cpp src/parser.cpp src/semantic.cpp src/token.cpp src/validation.cpp
+HEADERS := include/analysis.hpp include/ast.hpp include/codegen.hpp include/diagnostic.hpp include/hash.hpp include/module.hpp include/parser.hpp include/scanner.hpp include/semantic.hpp include/token.hpp include/validation.hpp include/version.hpp
 
-.PHONY: all test demo clean
+.PHONY: all test test-hash-unit demo clean
 
 all: $(TARGET)
 
@@ -33,6 +33,7 @@ test: $(TARGET)
 	@bash tests/test_scanner.sh
 	@bash tests/test_parser.sh
 	@bash tests/test_vista_link_parser.sh
+	@bash tests/test_vista_link_module.sh
 	@bash tests/test_semantic.sh
 	@bash tests/test_analysis.sh
 	@bash tests/test_codegen.sh
@@ -40,6 +41,13 @@ test: $(TARGET)
 	@bash tests/test_templates.sh
 	@bash tests/test_validation.sh
 	@bash tests/test_pipeline.sh
+
+test-hash-unit: build/test_hash_unit
+	@./build/test_hash_unit
+
+build/test_hash_unit: tests/test_hash_unit.cpp src/hash.cpp src/module.cpp src/semantic.cpp src/ast.cpp src/token.cpp include/hash.hpp include/module.hpp include/semantic.hpp include/ast.hpp include/diagnostic.hpp include/token.hpp
+	@mkdir -p build
+	$(CXX) $(CXXFLAGS) tests/test_hash_unit.cpp src/hash.cpp src/module.cpp src/semantic.cpp src/ast.cpp src/token.cpp -o $@
 
 demo: $(TARGET)
 	@echo "VISTA backend-only compiler and data-validation demonstration"

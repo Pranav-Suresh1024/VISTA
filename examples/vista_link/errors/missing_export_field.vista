@@ -1,0 +1,7 @@
+module MissingExportField {
+  field category: choice { general, reserved } {
+    label "Applicant category"
+  }
+
+  export missing
+}

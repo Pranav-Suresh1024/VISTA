@@ -2,6 +2,7 @@
 #include <fstream>
 #include <iomanip>
 #include <iostream>
+#include <iterator>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -10,6 +11,7 @@
 #include "ast.hpp"
 #include "codegen.hpp"
 #include "diagnostic.hpp"
+#include "module.hpp"
 #include "parser.hpp"
 #include "scanner.hpp"
 #include "semantic.hpp"
@@ -22,7 +24,7 @@ namespace {
 void print_help(std::ostream& output) {
     output << "VISTA - Validation and Interface Specification Translation Analyzer\n\n"
            << "Usage: vista <source.vista> --emit <tokens|ast|symbols|dependencies|graph|diagnostics>\n"
-           << "       vista <source.vista> --emit <html|all> --out-dir <directory>\n"
+           << "       vista <source.vista> --emit <html|all|module> --out-dir <directory>\n"
            << "       vista <source.vista> --validate-data <values.data>\n"
            << "       vista --list-templates\n"
            << "       vista [option]\n\n"
@@ -38,6 +40,7 @@ void print_help(std::ostream& output) {
            << "  --emit diagnostics  Run semantic and dependency analysis\n"
            << "  --emit html --out-dir DIR  Generate a standalone HTML form\n"
            << "  --emit all --out-dir DIR   Write every demonstration artifact\n"
+           << "  --emit module --out-dir DIR  Compile a deterministic module object\n"
            << "  --validate-data FILE  Validate supplied field values in the CLI\n";
 }
 
@@ -145,7 +148,8 @@ bool remove_artifact(const std::filesystem::path& directory,
 }
 
 bool clear_generated_artifacts(const std::filesystem::path& directory,
-                               bool all_mode) {
+                               bool all_mode,
+                               bool module_mode) {
     static const std::vector<std::string> all_artifacts{
         "tokens.txt",
         "ast.txt",
@@ -155,6 +159,9 @@ bool clear_generated_artifacts(const std::filesystem::path& directory,
         "diagnostics.txt",
         "form.html"
     };
+    if (module_mode) {
+        return remove_artifact(directory, "module.vobj");
+    }
     if (!all_mode) {
         return remove_artifact(directory, "form.html");
     }
@@ -217,7 +224,9 @@ int main(int argc, char* argv[]) {
     }
 
     const std::string emit_mode = validation_mode ? "" : argv[3];
-    const bool directory_mode = emit_mode == "html" || emit_mode == "all";
+    const bool module_mode = emit_mode == "module";
+    const bool directory_mode = emit_mode == "html" || emit_mode == "all" ||
+                                module_mode;
     const bool known_mode =
         emit_mode == "tokens" || emit_mode == "ast" || emit_mode == "symbols" ||
         emit_mode == "dependencies" || emit_mode == "graph" ||
@@ -235,19 +244,19 @@ int main(int argc, char* argv[]) {
         return 2;
     }
 
-    const vista::ScanResult scan_result = vista::scan_file(source_path);
-    if (!scan_result.input_opened) {
-        std::cerr << "VISTA: cannot open input file '" << source_path << "'\n";
-        return 2;
-    }
-
     const bool all_mode = emit_mode == "all";
     const std::filesystem::path output_directory = directory_mode ? argv[5] : "";
     if (directory_mode) {
         if (!prepare_output_directory(output_directory) ||
-            !clear_generated_artifacts(output_directory, all_mode)) {
+            !clear_generated_artifacts(output_directory, all_mode, module_mode)) {
             return 2;
         }
+    }
+
+    const vista::ScanResult scan_result = vista::scan_file(source_path);
+    if (!scan_result.input_opened) {
+        std::cerr << "VISTA: cannot open input file '" << source_path << "'\n";
+        return 2;
     }
 
     const std::string tokens_text = format_tokens(scan_result.tokens);
@@ -288,6 +297,37 @@ int main(int argc, char* argv[]) {
     }
     if (emit_mode == "ast") {
         std::cout << ast_text;
+        return 0;
+    }
+    if (module_mode) {
+        if (parse_result.module == nullptr) {
+            std::cerr << "VISTA: --emit module requires a module source\n";
+            return 2;
+        }
+        std::ifstream source_file(source_path, std::ios::binary);
+        if (!source_file) {
+            std::cerr << "VISTA: cannot reopen input file '" << source_path << "'\n";
+            return 2;
+        }
+        const std::string source_text((std::istreambuf_iterator<char>(source_file)),
+                                      std::istreambuf_iterator<char>());
+        if (source_file.bad()) {
+            std::cerr << "VISTA: failed while reading input file '" << source_path << "'\n";
+            return 2;
+        }
+        const vista::ModuleCompileResult module_result =
+            vista::compile_module(*parse_result.module, source_text);
+        print_diagnostics(source_path, module_result.diagnostics);
+        if (!module_result.succeeded()) {
+            return 1;
+        }
+        if (!write_artifact(output_directory,
+                            "module.vobj",
+                            vista::serialize_module_object(module_result.object))) {
+            return 2;
+        }
+        std::cout << "Generated " << (output_directory / "module.vobj").string()
+                  << '\n';
         return 0;
     }
     if (parse_result.form == nullptr) {

@@ -58,6 +58,7 @@ struct SemanticResult {
 };
 
 SemanticResult analyze_semantics(const FormAst& form);
+SemanticResult analyze_semantics(const ModuleAst& module);
 std::string format_symbol_table(const SymbolTable& symbols);
 
 }  // namespace vista

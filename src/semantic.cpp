@@ -155,24 +155,41 @@ std::string property_name(PropertyKind kind) {
 
 class SemanticAnalyzer {
 public:
-    explicit SemanticAnalyzer(const FormAst& source_form) : form(source_form) {}
+    explicit SemanticAnalyzer(const FormAst& form)
+        : declarations(form.declarations), root_span(form.span), require_field(true) {}
+
+    explicit SemanticAnalyzer(const ModuleAst& module)
+        : declarations(module.declarations),
+          root_span(module.span),
+          enter_condition(module.enter_condition) {
+        for (const ImportDecl* import : module.imports) {
+            imported_aliases.insert(import->alias);
+        }
+    }
 
     SemanticResult run() {
         collect_symbols();
-        if (result.symbols.entries().empty()) {
+        if (require_field && result.symbols.entries().empty()) {
             add_diagnostic(
-                result, "SEM016", "form must declare at least one field", form.span);
+                result, "SEM016", "form must declare at least one field", root_span);
         }
         validate_declarations();
+        if (enter_condition != nullptr) {
+            validate_condition(enter_condition, "entry condition");
+        }
         return std::move(result);
     }
 
 private:
-    const FormAst& form;
+    const std::vector<Declaration*>& declarations;
+    SourceSpan root_span;
+    bool require_field = false;
+    const Expression* enter_condition = nullptr;
+    std::unordered_set<std::string> imported_aliases;
     SemanticResult result;
 
     void collect_symbols() {
-        for (const Declaration* declaration : form.declarations) {
+        for (const Declaration* declaration : declarations) {
             if (declaration->kind != DeclarationKind::Field) {
                 continue;
             }
@@ -201,7 +218,7 @@ private:
     }
 
     void validate_declarations() {
-        for (const Declaration* declaration : form.declarations) {
+        for (const Declaration* declaration : declarations) {
             if (declaration->kind == DeclarationKind::Field) {
                 validate_field(*declaration->field);
             } else {
@@ -367,6 +384,9 @@ private:
     }
 
     void validate_condition(const Expression* expression, std::string_view description) {
+        if (contains_import(expression)) {
+            return;
+        }
         const ExpressionInfo info = analyze_expression(expression);
         if (info.type != ValueType::Boolean && info.type != ValueType::Error) {
             add_diagnostic(
@@ -381,6 +401,15 @@ private:
     ExpressionInfo remember(const Expression* expression, ExpressionInfo info) {
         result.expressions[expression] = info;
         return info;
+    }
+
+    bool contains_import(const Expression* expression) const {
+        if (expression == nullptr) {
+            return false;
+        }
+        return (expression->kind == ExpressionKind::Name &&
+                imported_aliases.find(expression->value) != imported_aliases.end()) ||
+               contains_import(expression->left) || contains_import(expression->right);
     }
 
     ExpressionInfo analyze_name(const Expression* expression,
@@ -613,6 +642,10 @@ const std::vector<Symbol>& SymbolTable::entries() const {
 
 SemanticResult analyze_semantics(const FormAst& form) {
     return SemanticAnalyzer(form).run();
+}
+
+SemanticResult analyze_semantics(const ModuleAst& module) {
+    return SemanticAnalyzer(module).run();
 }
 
 std::string format_symbol_table(const SymbolTable& symbols) {
