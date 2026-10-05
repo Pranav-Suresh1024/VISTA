@@ -72,6 +72,16 @@ BAD_STRING      \"([^\"\\\n]|\\.)*
 "when"         { TOKEN(When); }
 "check"        { TOKEN(Check); }
 "message"      { TOKEN(Message); }
+"module"       { TOKEN(Module); }
+"import"       { TOKEN(Import); }
+"export"       { TOKEN(Export); }
+"enter"        { TOKEN(Enter); }
+"workflow"     { TOKEN(Workflow); }
+"use"          { TOKEN(Use); }
+"as"           { TOKEN(As); }
+"start"        { TOKEN(Start); }
+"route"        { TOKEN(Route); }
+"present"      { TOKEN(Present); }
 
 "text"         { TOKEN(TypeText); }
 "integer"      { TOKEN(TypeInteger); }
@@ -94,6 +104,7 @@ BAD_STRING      \"([^\"\\\n]|\\.)*
 "!="           { TOKEN(NotEqual); }
 "<="           { TOKEN(LessEqual); }
 ">="           { TOKEN(GreaterEqual); }
+"->"           { TOKEN(Arrow); }
 "<"            { TOKEN(Less); }
 ">"            { TOKEN(Greater); }
 
@@ -103,6 +114,7 @@ BAD_STRING      \"([^\"\\\n]|\\.)*
 ")"            { TOKEN(RightParen); }
 ":"            { TOKEN(Colon); }
 ","            { TOKEN(Comma); }
+"."            { TOKEN(Dot); }
 
 {DECIMAL}       { TOKEN(DecimalLiteral); }
 {INTEGER}       { TOKEN(IntegerLiteral); }

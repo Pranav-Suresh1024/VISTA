@@ -32,6 +32,7 @@ $(TARGET): $(SOURCES) $(HEADERS) $(GENERATED_SCANNER) $(GENERATED_PARSER) $(GENE
 test: $(TARGET)
 	@bash tests/test_scanner.sh
 	@bash tests/test_parser.sh
+	@bash tests/test_vista_link_parser.sh
 	@bash tests/test_semantic.sh
 	@bash tests/test_analysis.sh
 	@bash tests/test_codegen.sh

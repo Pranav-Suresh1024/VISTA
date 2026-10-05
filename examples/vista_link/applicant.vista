@@ -1,0 +1,8 @@
+module Applicant {
+  field category: choice { general, reserved } {
+    label "Applicant category"
+    required
+  }
+
+  export category
+}

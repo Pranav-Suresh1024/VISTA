@@ -1,5 +1,6 @@
 #include "parser.hpp"
 
+#include <set>
 #include <string>
 
 #include "vista_parser.hpp"
@@ -46,6 +47,18 @@ VISTA_ASSERT_TOKEN(Comma, COMMA);
 VISTA_ASSERT_TOKEN(TypeEmail, TYPE_EMAIL);
 VISTA_ASSERT_TOKEN(TypePhone, TYPE_PHONE);
 VISTA_ASSERT_TOKEN(TypeTextarea, TYPE_TEXTAREA);
+VISTA_ASSERT_TOKEN(Module, MODULE);
+VISTA_ASSERT_TOKEN(Import, IMPORT);
+VISTA_ASSERT_TOKEN(Export, EXPORT);
+VISTA_ASSERT_TOKEN(Enter, ENTER);
+VISTA_ASSERT_TOKEN(Workflow, WORKFLOW);
+VISTA_ASSERT_TOKEN(Use, USE);
+VISTA_ASSERT_TOKEN(As, AS);
+VISTA_ASSERT_TOKEN(Start, START);
+VISTA_ASSERT_TOKEN(Route, ROUTE);
+VISTA_ASSERT_TOKEN(Present, PRESENT);
+VISTA_ASSERT_TOKEN(Arrow, ARROW);
+VISTA_ASSERT_TOKEN(Dot, DOT);
 
 #undef VISTA_ASSERT_TOKEN
 
@@ -129,6 +142,17 @@ ParseResult parse_tokens(const std::vector<Token>& tokens) {
     const int status = yyparse(context);
     if (status != 0 && result.diagnostics.empty()) {
         result.diagnostics.push_back({"SYN001", "syntax analysis failed", 1, 1});
+    }
+    if (status == 0 && result.module != nullptr) {
+        std::set<std::string> exported_fields;
+        for (const ExportDecl* export_decl : result.module->exports) {
+            if (!exported_fields.insert(export_decl->field).second) {
+                result.diagnostics.push_back(
+                    {"MOD003", "field '" + export_decl->field +
+                                   "' is exported more than once",
+                     export_decl->span.first_line, export_decl->span.first_column});
+            }
+        }
     }
     return result;
 }

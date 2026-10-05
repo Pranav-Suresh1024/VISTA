@@ -1,0 +1,6 @@
+workflow MalformedRoute {
+  use "applicant.vista" as Applicant
+  use "certificate.vista" as Certificate
+  start Applicant
+  route Applicant Certificate
+}

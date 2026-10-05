@@ -13,10 +13,15 @@ namespace vista {
 struct ParseResult {
     AstArena arena;
     FormAst* form = nullptr;
+    ModuleAst* module = nullptr;
+    WorkflowAst* workflow = nullptr;
     std::vector<Diagnostic> diagnostics;
 
     bool succeeded() const {
-        return form != nullptr && diagnostics.empty();
+        const int root_count = (form != nullptr ? 1 : 0) +
+                               (module != nullptr ? 1 : 0) +
+                               (workflow != nullptr ? 1 : 0);
+        return root_count == 1 && diagnostics.empty();
     }
 };
 
@@ -31,6 +36,15 @@ struct ParserContext {
     std::string form_description;
     bool has_form_title = false;
     bool has_form_description = false;
+    std::vector<ImportDecl*> module_imports;
+    std::vector<ExportDecl*> module_exports;
+    Expression* module_enter_condition = nullptr;
+    std::vector<Declaration*> module_declarations;
+    std::vector<WorkflowUse*> workflow_uses;
+    std::string workflow_start_module;
+    std::vector<RouteDecl*> workflow_routes;
+    bool has_module_enter = false;
+    bool has_workflow_start = false;
 };
 
 ParseResult parse_tokens(const std::vector<Token>& tokens);

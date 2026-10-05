@@ -278,10 +278,21 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    const std::string ast_text = vista::format_ast(*parse_result.form);
+    std::string ast_text;
+    if (parse_result.form != nullptr) {
+        ast_text = vista::format_ast(*parse_result.form);
+    } else if (parse_result.module != nullptr) {
+        ast_text = vista::format_ast(*parse_result.module);
+    } else {
+        ast_text = vista::format_ast(*parse_result.workflow);
+    }
     if (emit_mode == "ast") {
         std::cout << ast_text;
         return 0;
+    }
+    if (parse_result.form == nullptr) {
+        std::cerr << "VISTA: only --emit ast is supported for modules and workflows\n";
+        return 2;
     }
     if (all_mode && !write_artifact(output_directory, "ast.txt", ast_text)) {
         return 2;

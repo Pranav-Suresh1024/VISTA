@@ -46,6 +46,18 @@ std::string_view token_kind_name(TokenKind kind) {
         case TokenKind::TypeEmail: return "TYPE_EMAIL";
         case TokenKind::TypePhone: return "TYPE_PHONE";
         case TokenKind::TypeTextarea: return "TYPE_TEXTAREA";
+        case TokenKind::Module: return "MODULE";
+        case TokenKind::Import: return "IMPORT";
+        case TokenKind::Export: return "EXPORT";
+        case TokenKind::Enter: return "ENTER";
+        case TokenKind::Workflow: return "WORKFLOW";
+        case TokenKind::Use: return "USE";
+        case TokenKind::As: return "AS";
+        case TokenKind::Start: return "START";
+        case TokenKind::Route: return "ROUTE";
+        case TokenKind::Present: return "PRESENT";
+        case TokenKind::Arrow: return "ARROW";
+        case TokenKind::Dot: return "DOT";
     }
     return "UNKNOWN";
 }

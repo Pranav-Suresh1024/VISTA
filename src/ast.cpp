@@ -77,35 +77,9 @@ std::string property_name(PropertyKind kind) {
     return "UnknownProperty";
 }
 
-}  // namespace
-
-std::string field_type_name(FieldType type) {
-    switch (type) {
-        case FieldType::Text: return "text";
-        case FieldType::Integer: return "integer";
-        case FieldType::Decimal: return "decimal";
-        case FieldType::Boolean: return "boolean";
-        case FieldType::Date: return "date";
-        case FieldType::Choice: return "choice";
-        case FieldType::File: return "file";
-        case FieldType::Email: return "email";
-        case FieldType::Phone: return "phone";
-        case FieldType::Textarea: return "textarea";
-    }
-    return "unknown";
-}
-
-std::string format_ast(const FormAst& form) {
-    std::ostringstream output;
-    output << "Form " << form.name << ' ' << location_text(form.span) << '\n';
-    if (form.title != form.name) {
-        output << "  Title " << display_lexeme(form.title) << '\n';
-    }
-    if (!form.description.empty()) {
-        output << "  Description " << display_lexeme(form.description) << '\n';
-    }
-
-    for (const Declaration* declaration : form.declarations) {
+void print_declarations(std::ostringstream& output,
+                        const std::vector<Declaration*>& declarations) {
+    for (const Declaration* declaration : declarations) {
         if (declaration->kind == DeclarationKind::Field) {
             const FieldDecl& field = *declaration->field;
             indent(output, 1);
@@ -151,7 +125,83 @@ std::string format_ast(const FormAst& form) {
         indent(output, 2);
         output << "Message " << display_lexeme(check.message) << '\n';
     }
+}
 
+}  // namespace
+
+std::string field_type_name(FieldType type) {
+    switch (type) {
+        case FieldType::Text: return "text";
+        case FieldType::Integer: return "integer";
+        case FieldType::Decimal: return "decimal";
+        case FieldType::Boolean: return "boolean";
+        case FieldType::Date: return "date";
+        case FieldType::Choice: return "choice";
+        case FieldType::File: return "file";
+        case FieldType::Email: return "email";
+        case FieldType::Phone: return "phone";
+        case FieldType::Textarea: return "textarea";
+    }
+    return "unknown";
+}
+
+std::string format_ast(const FormAst& form) {
+    std::ostringstream output;
+    output << "Form " << form.name << ' ' << location_text(form.span) << '\n';
+    if (form.title != form.name) {
+        output << "  Title " << display_lexeme(form.title) << '\n';
+    }
+    if (!form.description.empty()) {
+        output << "  Description " << display_lexeme(form.description) << '\n';
+    }
+
+    print_declarations(output, form.declarations);
+
+    return output.str();
+}
+
+std::string format_ast(const ModuleAst& module) {
+    std::ostringstream output;
+    output << "Module " << module.name << ' ' << location_text(module.span) << '\n';
+    for (const ImportDecl* import : module.imports) {
+        indent(output, 1);
+        output << "Import " << import->provider << '.' << import->field
+               << " as " << import->alias << ' ' << location_text(import->span) << '\n';
+    }
+    for (const ExportDecl* export_decl : module.exports) {
+        indent(output, 1);
+        output << "Export " << export_decl->field << ' '
+               << location_text(export_decl->span) << '\n';
+    }
+    if (module.enter_condition != nullptr) {
+        indent(output, 1);
+        output << "EnterWhen\n";
+        print_expression(output, module.enter_condition, 2);
+    }
+    print_declarations(output, module.declarations);
+    return output.str();
+}
+
+std::string format_ast(const WorkflowAst& workflow) {
+    std::ostringstream output;
+    output << "Workflow " << workflow.name << ' ' << location_text(workflow.span) << '\n';
+    for (const WorkflowUse* use : workflow.uses) {
+        indent(output, 1);
+        output << "Use " << use->alias << ' ' << display_lexeme(use->source_path)
+               << ' ' << location_text(use->span) << '\n';
+    }
+    if (!workflow.start_module.empty()) {
+        indent(output, 1);
+        output << "Start " << workflow.start_module << '\n';
+    }
+    for (const RouteDecl* route : workflow.routes) {
+        indent(output, 1);
+        output << "Route " << route->source << " -> " << route->destination
+               << ' ' << location_text(route->span) << '\n';
+        if (route->condition != nullptr) {
+            print_expression(output, route->condition, 2);
+        }
+    }
     return output.str();
 }
 

@@ -47,7 +47,19 @@ enum class TokenKind : int {
     Comma,
     TypeEmail,
     TypePhone,
-    TypeTextarea
+    TypeTextarea,
+    Module,
+    Import,
+    Export,
+    Enter,
+    Workflow,
+    Use,
+    As,
+    Start,
+    Route,
+    Present,
+    Arrow,
+    Dot
 };
 
 struct Token {

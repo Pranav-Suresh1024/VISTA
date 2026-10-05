@@ -1,0 +1,11 @@
+module Certificate {
+  import Applicant category as applicant_category
+
+  field certificate: file {
+    label "Category certificate"
+    required
+  }
+
+  enter when applicant_category == reserved and present(certificate)
+  export certificate
+}

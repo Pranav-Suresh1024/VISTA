@@ -1,0 +1,8 @@
+module DuplicateExport {
+  field category: choice { general, reserved } {
+    label "Applicant category"
+  }
+
+  export category
+  export category
+}

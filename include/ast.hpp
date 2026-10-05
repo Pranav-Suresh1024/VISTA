@@ -162,6 +162,94 @@ struct FormAst final : AstNode {
     std::vector<Declaration*> declarations;
 };
 
+struct ImportDecl final : AstNode {
+    ImportDecl(std::string import_provider,
+               std::string import_field,
+               std::string import_alias,
+               SourceSpan source_span)
+        : AstNode(source_span),
+          provider(std::move(import_provider)),
+          field(std::move(import_field)),
+          alias(std::move(import_alias)) {}
+
+    std::string provider;
+    std::string field;
+    std::string alias;
+};
+
+struct ExportDecl final : AstNode {
+    ExportDecl(std::string export_field, SourceSpan source_span)
+        : AstNode(source_span), field(std::move(export_field)) {}
+
+    std::string field;
+};
+
+struct ModuleAst final : AstNode {
+    ModuleAst(std::string module_name,
+              std::vector<ImportDecl*> module_imports,
+              std::vector<ExportDecl*> module_exports,
+              Expression* module_enter_condition,
+              std::vector<Declaration*> module_declarations,
+              SourceSpan source_span)
+        : AstNode(source_span),
+          name(std::move(module_name)),
+          imports(std::move(module_imports)),
+          exports(std::move(module_exports)),
+          enter_condition(module_enter_condition),
+          declarations(std::move(module_declarations)) {}
+
+    std::string name;
+    std::vector<ImportDecl*> imports;
+    std::vector<ExportDecl*> exports;
+    Expression* enter_condition = nullptr;
+    std::vector<Declaration*> declarations;
+};
+
+struct WorkflowUse final : AstNode {
+    WorkflowUse(std::string workflow_source_path,
+                std::string workflow_alias,
+                SourceSpan source_span)
+        : AstNode(source_span),
+          source_path(std::move(workflow_source_path)),
+          alias(std::move(workflow_alias)) {}
+
+    std::string source_path;
+    std::string alias;
+};
+
+struct RouteDecl final : AstNode {
+    RouteDecl(std::string route_source,
+              std::string route_destination,
+              Expression* route_condition,
+              SourceSpan source_span)
+        : AstNode(source_span),
+          source(std::move(route_source)),
+          destination(std::move(route_destination)),
+          condition(route_condition) {}
+
+    std::string source;
+    std::string destination;
+    Expression* condition = nullptr;
+};
+
+struct WorkflowAst final : AstNode {
+    WorkflowAst(std::string workflow_name,
+                std::vector<WorkflowUse*> workflow_uses,
+                std::string workflow_start_module,
+                std::vector<RouteDecl*> workflow_routes,
+                SourceSpan source_span)
+        : AstNode(source_span),
+          name(std::move(workflow_name)),
+          uses(std::move(workflow_uses)),
+          start_module(std::move(workflow_start_module)),
+          routes(std::move(workflow_routes)) {}
+
+    std::string name;
+    std::vector<WorkflowUse*> uses;
+    std::string start_module;
+    std::vector<RouteDecl*> routes;
+};
+
 class AstArena {
 public:
     template <typename Node, typename... Arguments>
@@ -178,6 +266,8 @@ private:
 
 std::string field_type_name(FieldType type);
 std::string format_ast(const FormAst& form);
+std::string format_ast(const ModuleAst& module);
+std::string format_ast(const WorkflowAst& workflow);
 
 }  // namespace vista
 

@@ -63,6 +63,10 @@ void yyerror(YYLTYPE* location,
     vista::FieldDecl* field;
     vista::CheckDecl* check;
     vista::Declaration* declaration;
+    vista::ImportDecl* import_decl;
+    vista::ExportDecl* export_decl;
+    vista::WorkflowUse* workflow_use;
+    vista::RouteDecl* route;
     vista::TypeSpec* type_spec;
     std::vector<std::string>* text_list;
     std::vector<vista::FieldProperty*>* property_list;
@@ -108,6 +112,18 @@ void yyerror(YYLTYPE* location,
 %token <text> TYPE_EMAIL 292 "email"
 %token <text> TYPE_PHONE 293 "phone"
 %token <text> TYPE_TEXTAREA 294 "textarea"
+%token MODULE 295 "module"
+%token IMPORT 296 "import"
+%token EXPORT 297 "export"
+%token ENTER 298 "enter"
+%token WORKFLOW 299 "workflow"
+%token USE 300 "use"
+%token AS 301 "as"
+%token START 302 "start"
+%token ROUTE 303 "route"
+%token PRESENT 304 "present"
+%token ARROW 305 "->"
+%token DOT 306 "."
 
 %type <text> identifier
 %type <declaration_list> declaration_list
@@ -119,6 +135,11 @@ void yyerror(YYLTYPE* location,
 %type <property_list> property_list
 %type <property> field_property
 %type <expression> expression
+%type <expression> optional_when
+%type <import_decl> import_declaration
+%type <export_decl> export_declaration
+%type <workflow_use> workflow_use
+%type <route> route_declaration
 
 %destructor { delete $$; } <text> <text_list> <property_list> <declaration_list> <type_spec>
 
@@ -142,6 +163,141 @@ program:
             make_span(@1, @5));
         delete $2;
         delete $4;
+    }
+  | MODULE identifier LEFT_BRACE module_item_list RIGHT_BRACE
+    {
+        context.result.module = context.result.arena.make<vista::ModuleAst>(
+            *$2,
+            std::move(context.module_imports),
+            std::move(context.module_exports),
+            context.module_enter_condition,
+            std::move(context.module_declarations),
+            make_span(@1, @5));
+        delete $2;
+    }
+  | WORKFLOW identifier LEFT_BRACE workflow_item_list RIGHT_BRACE
+    {
+        context.result.workflow = context.result.arena.make<vista::WorkflowAst>(
+            *$2,
+            std::move(context.workflow_uses),
+            std::move(context.workflow_start_module),
+            std::move(context.workflow_routes),
+            make_span(@1, @5));
+        delete $2;
+    }
+;
+
+module_item_list:
+    %empty
+  | module_item_list module_item
+;
+
+module_item:
+    import_declaration
+    {
+        context.module_imports.push_back($1);
+    }
+  | export_declaration
+    {
+        context.module_exports.push_back($1);
+    }
+  | ENTER WHEN expression
+    {
+        if (context.has_module_enter) {
+            context.result.diagnostics.push_back(
+                {"SYN002", "module enter condition is declared more than once",
+                 static_cast<std::size_t>(@1.first_line),
+                 static_cast<std::size_t>(@1.first_column)});
+        } else {
+            context.module_enter_condition = $3;
+            context.has_module_enter = true;
+        }
+    }
+  | declaration
+    {
+        if ($1 != nullptr) {
+            context.module_declarations.push_back($1);
+        }
+    }
+;
+
+import_declaration:
+    IMPORT identifier identifier AS identifier
+    {
+        $$ = context.result.arena.make<vista::ImportDecl>(
+            *$2, *$3, *$5, make_span(@1, @5));
+        delete $2;
+        delete $3;
+        delete $5;
+    }
+;
+
+export_declaration:
+    EXPORT identifier
+    {
+        $$ = context.result.arena.make<vista::ExportDecl>(
+            *$2, make_span(@1, @2));
+        delete $2;
+    }
+;
+
+workflow_item_list:
+    %empty
+  | workflow_item_list workflow_item
+;
+
+workflow_item:
+    workflow_use
+    {
+        context.workflow_uses.push_back($1);
+    }
+  | START identifier
+    {
+        if (context.has_workflow_start) {
+            context.result.diagnostics.push_back(
+                {"SYN002", "workflow start module is declared more than once",
+                 static_cast<std::size_t>(@1.first_line),
+                 static_cast<std::size_t>(@1.first_column)});
+        } else {
+            context.workflow_start_module = *$2;
+            context.has_workflow_start = true;
+        }
+        delete $2;
+    }
+  | route_declaration
+    {
+        context.workflow_routes.push_back($1);
+    }
+;
+
+workflow_use:
+    USE STRING_LITERAL AS identifier
+    {
+        $$ = context.result.arena.make<vista::WorkflowUse>(
+            *$2, *$4, make_span(@1, @4));
+        delete $2;
+        delete $4;
+    }
+;
+
+route_declaration:
+    ROUTE identifier ARROW identifier optional_when
+    {
+        $$ = context.result.arena.make<vista::RouteDecl>(
+            *$2, *$4, $5, make_span(@1, @5));
+        delete $2;
+        delete $4;
+    }
+;
+
+optional_when:
+    %empty
+    {
+        $$ = nullptr;
+    }
+  | WHEN expression
+    {
+        $$ = $2;
     }
 ;
 
@@ -384,6 +540,13 @@ expression:
             vista::ExpressionKind::Name, *$1, make_span(@1, @1));
         delete $1;
     }
+  | identifier DOT identifier
+    {
+        $$ = context.result.arena.make<vista::Expression>(
+            vista::ExpressionKind::Name, *$1 + "." + *$3, make_span(@1, @3));
+        delete $1;
+        delete $3;
+    }
   | STRING_LITERAL
     {
         $$ = context.result.arena.make<vista::Expression>(
@@ -421,6 +584,14 @@ expression:
     {
         $$ = context.result.arena.make<vista::Expression>(
             vista::ExpressionKind::Unary, "not", make_span(@1, @2), $2);
+    }
+  | PRESENT LEFT_PAREN identifier RIGHT_PAREN
+    {
+        vista::Expression* operand = context.result.arena.make<vista::Expression>(
+            vista::ExpressionKind::Name, *$3, make_span(@3, @3));
+        $$ = context.result.arena.make<vista::Expression>(
+            vista::ExpressionKind::Unary, "present", make_span(@1, @4), operand);
+        delete $3;
     }
   | expression OR expression
     {
