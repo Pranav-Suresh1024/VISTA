@@ -38,6 +38,7 @@ test: $(TARGET)
 	@bash tests/test_vista_link_linker.sh
 	@bash tests/test_vista_link_evaluator.sh
 	@bash tests/test_vista_link_partition.sh
+	@bash tests/test_vista_link_codegen.sh
 	@bash tests/test_semantic.sh
 	@bash tests/test_analysis.sh
 	@bash tests/test_codegen.sh
