@@ -1,22 +1,20 @@
 #include "analysis.hpp"
+#include "linker.hpp"
+#include "partition.hpp"
 
 #include <algorithm>
 #include <cstddef>
 #include <functional>
 #include <iomanip>
-#include <optional>
 #include <set>
 #include <sstream>
 #include <string>
 #include <unordered_map>
-#include <unordered_set>
 #include <utility>
 #include <vector>
 
 namespace vista {
 namespace {
-
-using Assignment = std::unordered_map<std::string, std::string>;
 
 void add_diagnostic(AnalysisResult& result,
                     std::string code,
@@ -49,267 +47,90 @@ void collect_references(const Expression* expression,
     collect_references(expression->right, semantics, references);
 }
 
-bool is_finite_field(const Symbol* symbol) {
-    return symbol != nullptr &&
-           (symbol->type == FieldType::Boolean || symbol->type == FieldType::Choice);
+void combine(IrExpression& aggregate, IrExpression condition, const std::string& operation) {
+    if (aggregate.kind == ExpressionKind::BooleanLiteral &&
+        aggregate.value == (operation == "and" ? "true" : "false")) aggregate = std::move(condition);
+    else aggregate = {ExpressionKind::Binary, ValueType::Boolean, operation,
+                      {std::move(aggregate), std::move(condition)}, false};
 }
 
-bool expression_is_finite(const Expression* expression,
-                          const SemanticResult& semantics) {
-    if (expression == nullptr) {
-        return false;
+void analyze_hidden_required(const FormAst& form, const FieldDecl& target,
+                             const SemanticResult& semantics, AnalysisResult& result) {
+    bool show = false, require = false;
+    std::vector<std::string> references;
+    for (const auto* p : target.properties) {
+        show = show || p->kind == PropertyKind::ShowWhen;
+        require = require || p->kind == PropertyKind::Required || p->kind == PropertyKind::RequiredWhen;
+        if (p->condition) collect_references(p->condition, semantics, references);
     }
-
-    switch (expression->kind) {
-        case ExpressionKind::BooleanLiteral:
-            return true;
-        case ExpressionKind::Name: {
-            const auto information = semantics.expressions.find(expression);
-            if (information != semantics.expressions.end() &&
-                information->second.choice_literal) {
-                return true;
-            }
-            return is_finite_field(semantics.symbols.find(expression->value));
+    if (!show || !require) return;
+    std::map<std::string, std::string> names;
+    for (const auto& s : semantics.symbols.entries()) names[s.name] = s.name;
+    LinkedWorkflow workflow; workflow.name = form.name; workflow.start_alias = form.name;
+    LinkedModule module; module.alias = form.name;
+    for (const auto* d : form.declarations) {
+        if (d->kind != DeclarationKind::Field) continue;
+        const auto& f = *d->field;
+        if (f.name != target.name && std::find(references.begin(), references.end(), f.name) == references.end()) continue;
+        LinkedField linked; linked.qualified_name = f.name; linked.type = f.type; linked.options = f.options;
+        // Other fields contribute scalar domains, not unrelated rules.
+        if (f.name == target.name) for (const auto* p : f.properties) {
+            if (p->kind == PropertyKind::Required) combine(linked.requiredness, {}, "or");
+            else if (p->kind == PropertyKind::RequiredWhen)
+                combine(linked.requiredness, lower_expression(p->condition, semantics, names), "or");
+            else if (p->kind == PropertyKind::ShowWhen)
+                combine(linked.visibility, lower_expression(p->condition, semantics, names), "and");
         }
-        case ExpressionKind::Unary:
-            return expression->value == "not" &&
-                   expression_is_finite(expression->left, semantics);
-        case ExpressionKind::Binary:
-            if (expression->value == "and" || expression->value == "or" ||
-                expression->value == "==" || expression->value == "!=") {
-                return expression_is_finite(expression->left, semantics) &&
-                       expression_is_finite(expression->right, semantics);
-            }
-            return false;
-        case ExpressionKind::StringLiteral: {
-            const auto information = semantics.expressions.find(expression);
-            return information != semantics.expressions.end() &&
-                   information->second.choice_literal;
-        }
-        case ExpressionKind::IntegerLiteral:
-        case ExpressionKind::DecimalLiteral:
-            return false;
+        module.fields.push_back(std::move(linked));
     }
-    return false;
-}
-
-std::optional<bool> evaluate_condition(const Expression* expression,
-                                       const SemanticResult& semantics,
-                                       const Assignment& assignment);
-
-std::optional<std::string> evaluate_scalar(const Expression* expression,
-                                           const SemanticResult& semantics,
-                                           const Assignment& assignment) {
-    const auto expression_information = semantics.expressions.find(expression);
-    if (expression_information != semantics.expressions.end() &&
-        expression_information->second.choice_literal) {
-        return expression->value;
-    }
-    if (expression->kind == ExpressionKind::BooleanLiteral) {
-        return expression->value;
-    }
-    if (expression->kind != ExpressionKind::Name) {
-        const auto information = semantics.expressions.find(expression);
-        if (information != semantics.expressions.end() &&
-            information->second.type == ValueType::Boolean) {
-            const std::optional<bool> value =
-                evaluate_condition(expression, semantics, assignment);
-            if (value.has_value()) {
-                return *value ? "true" : "false";
-            }
-        }
-        return std::nullopt;
-    }
-
-    const auto value = assignment.find(expression->value);
-    if (value == assignment.end()) {
-        return std::nullopt;
-    }
-    return value->second;
-}
-
-std::optional<bool> evaluate_condition(const Expression* expression,
-                                       const SemanticResult& semantics,
-                                       const Assignment& assignment) {
-    if (expression->kind == ExpressionKind::BooleanLiteral) {
-        return expression->value == "true";
-    }
-    if (expression->kind == ExpressionKind::Name) {
-        const std::optional<std::string> value =
-            evaluate_scalar(expression, semantics, assignment);
-        if (!value.has_value() || (*value != "true" && *value != "false")) {
-            return std::nullopt;
-        }
-        return *value == "true";
-    }
-    if (expression->kind == ExpressionKind::Unary) {
-        const std::optional<bool> operand =
-            evaluate_condition(expression->left, semantics, assignment);
-        if (!operand.has_value()) {
-            return std::nullopt;
-        }
-        return !*operand;
-    }
-    if (expression->kind != ExpressionKind::Binary) {
-        return std::nullopt;
-    }
-
-    if (expression->value == "and" || expression->value == "or") {
-        const std::optional<bool> left =
-            evaluate_condition(expression->left, semantics, assignment);
-        const std::optional<bool> right =
-            evaluate_condition(expression->right, semantics, assignment);
-        if (!left.has_value() || !right.has_value()) {
-            return std::nullopt;
-        }
-        return expression->value == "and" ? *left && *right : *left || *right;
-    }
-
-    const std::optional<std::string> left =
-        evaluate_scalar(expression->left, semantics, assignment);
-    const std::optional<std::string> right =
-        evaluate_scalar(expression->right, semantics, assignment);
-    if (!left.has_value() || !right.has_value()) {
-        return std::nullopt;
-    }
-    return expression->value == "==" ? *left == *right : *left != *right;
-}
-
-std::string witness_text(const std::vector<const Symbol*>& variables,
-                         const Assignment& assignment,
-                         const std::string& field_name) {
-    std::ostringstream output;
-    bool first = true;
-    for (const Symbol* variable : variables) {
-        if (!first) {
-            output << ", ";
-        }
-        first = false;
-        output << variable->name << '=' << assignment.at(variable->name);
-    }
-    if (!first) {
-        output << ", ";
-    }
-    output << field_name << ".visible=false, "
-           << field_name << ".required=true";
-    return output.str();
-}
-
-void analyze_hidden_required(const FieldDecl& field,
-                             const SemanticResult& semantics,
-                             AnalysisResult& result) {
-    std::vector<const Expression*> show_conditions;
-    std::vector<const Expression*> required_conditions;
-    bool always_required = false;
-
-    for (const FieldProperty* property : field.properties) {
-        if (property->kind == PropertyKind::ShowWhen) {
-            show_conditions.push_back(property->condition);
-        } else if (property->kind == PropertyKind::Required) {
-            always_required = true;
-        } else if (property->kind == PropertyKind::RequiredWhen) {
-            required_conditions.push_back(property->condition);
-        }
-    }
-
-    if (show_conditions.empty() || (!always_required && required_conditions.empty())) {
+    workflow.modules.push_back(std::move(module));
+    const auto partitions = derive_partitions(workflow);
+    if (!partitions.complete()) {
+        for (const auto& d : partitions.diagnostics)
+            add_diagnostic(result, d.code == "CERT001" ? "ANL900" : d.code,
+                "cannot prove hidden-required safety for field '" + target.name + "': " + d.message, target.span);
         return;
     }
-
-    std::vector<const Expression*> conditions = show_conditions;
-    conditions.insert(
-        conditions.end(), required_conditions.begin(), required_conditions.end());
-    if (std::any_of(conditions.begin(), conditions.end(), [&](const Expression* condition) {
-            return !expression_is_finite(condition, semantics);
-        })) {
-        add_diagnostic(
-            result,
-            "ANL900",
-            "cannot prove hidden-required safety for field '" + field.name +
-                "' because its conditions are outside Boolean/choice witness analysis",
-            field.span);
+    const auto cases = enumerate_route_cases(workflow, partitions);
+    if (!cases.complete()) {
+        for (const auto& d : cases.diagnostics) add_diagnostic(result, d.code, d.message, target.span);
         return;
     }
-
-    std::unordered_set<std::string> used_names;
-    for (const Expression* condition : conditions) {
-        std::vector<std::string> references;
-        collect_references(condition, semantics, references);
-        used_names.insert(references.begin(), references.end());
-    }
-
-    std::vector<const Symbol*> variables;
-    std::size_t assignment_count = 1;
-    for (const Symbol& symbol : semantics.symbols.entries()) {
-        if (used_names.find(symbol.name) == used_names.end()) {
-            continue;
+    const auto& fields = workflow.modules[0].fields;
+    const auto& linked_target = *std::find_if(fields.begin(), fields.end(),
+        [&](const auto& f) { return f.qualified_name == target.name; });
+    for (const auto& c : cases.cases) {
+        if (c.active_module.empty()) continue;
+        RuntimeValues values; bool valid = true;
+        for (const auto& f : fields) {
+            const auto supplied = c.values.find(f.qualified_name); std::vector<Diagnostic> ignored;
+            values[f.qualified_name] = convert_value(f, supplied == c.values.end() ? nullptr : &supplied->second, ignored);
+            if (f.qualified_name == target.name) continue;
+            valid = valid && values.at(f.qualified_name).valid;
+            // Preserve declared-option Boolean/choice witnesses.
+            if (f.type == FieldType::Choice && !values.at(f.qualified_name).present) valid = false;
         }
-        variables.push_back(&symbol);
-        const std::size_t domain_size =
-            symbol.type == FieldType::Boolean ? 2U : symbol.options.size();
-        if (domain_size == 0 || assignment_count > 65536U / domain_size) {
-            add_diagnostic(
-                result,
-                "ANL900",
-                "cannot search hidden-required states for field '" + field.name +
-                    "' because its finite state space exceeds 65536 assignments",
-                field.span);
-            return;
+        bool required = false, visible = false;
+        if (!valid || !evaluate_expression(linked_target.requiredness, values, required) ||
+            !evaluate_expression(linked_target.visibility, values, visible) || !required || visible) continue;
+        const auto step = evaluate_workflow_step(workflow, c.values, form.name);
+        const auto observed = std::find_if(step.observation.fields.begin(), step.observation.fields.end(),
+            [&](const auto& f) { return f.field == target.name; });
+        if (observed == step.observation.fields.end() || observed->visible) continue;
+        std::ostringstream witness;
+        for (const auto& symbol : semantics.symbols.entries()) {
+            if (std::find(references.begin(), references.end(), symbol.name) == references.end()) continue;
+            const auto& value = values.at(symbol.name);
+            witness << symbol.name << '=';
+            if (symbol.type == FieldType::Boolean) witness << (value.boolean ? "true" : "false");
+            else if (value.present) witness << value.text;
+            else if (symbol.type == FieldType::Integer || symbol.type == FieldType::Decimal) witness << '0';
+            witness << ", ";
         }
-        assignment_count *= domain_size;
-    }
-
-    Assignment assignment;
-    std::optional<std::string> witness;
-    // Enumerate the small, finite domains until required && !visible is found.
-    std::function<void(std::size_t)> search = [&](std::size_t index) {
-        if (witness.has_value()) {
-            return;
-        }
-        if (index != variables.size()) {
-            const Symbol* variable = variables[index];
-            if (variable->type == FieldType::Boolean) {
-                for (const std::string value : {"false", "true"}) {
-                    assignment[variable->name] = value;
-                    search(index + 1);
-                }
-            } else {
-                for (const std::string& option : variable->options) {
-                    assignment[variable->name] = option;
-                    search(index + 1);
-                }
-            }
-            return;
-        }
-
-        // Multiple show rules are conjunctive; any false rule hides the field.
-        bool visible = true;
-        for (const Expression* condition : show_conditions) {
-            const std::optional<bool> value =
-                evaluate_condition(condition, semantics, assignment);
-            visible = visible && value.value_or(false);
-        }
-
-        // An unconditional rule or any matching conditional rule requires it.
-        bool required = always_required;
-        for (const Expression* condition : required_conditions) {
-            const std::optional<bool> value =
-                evaluate_condition(condition, semantics, assignment);
-            required = required || value.value_or(false);
-        }
-        if (required && !visible) {
-            witness = witness_text(variables, assignment, field.name);
-        }
-    };
-    search(0);
-
-    if (witness.has_value()) {
-        add_diagnostic(
-            result,
-            "ANL003",
-            "field '" + field.name +
-                "' can be required while hidden; witness: " + *witness,
-            field.span);
+        witness << target.name << ".visible=false, " << target.name << ".required=true";
+        add_diagnostic(result, "ANL003", "field '" + target.name +
+            "' can be required while hidden; witness: " + witness.str(), target.span);
+        return;
     }
 }
 
@@ -415,7 +236,7 @@ AnalysisResult analyze_dependencies(const FormAst& form,
                 }
             }
         }
-        analyze_hidden_required(field, semantics, result);
+        analyze_hidden_required(form, field, semantics, result);
     }
 
     detect_cycles(semantics, result);

@@ -62,7 +62,7 @@ check_failure examples/self_dependency.vista ANL001 "field 'consent' has a self-
 check_failure examples/dependency_cycle.vista ANL002 "dependency cycle detected"
 check_failure examples/hidden_required.vista ANL003 "category=general, certificate.visible=false, certificate.required=true"
 check_failure examples/boolean_hidden_required.vista ANL003 "employed=false, employer.visible=false, employer.required=true"
-check_failure examples/numeric_analysis_limit.vista ANL900 "outside Boolean/choice witness analysis"
+check_failure examples/numeric_analysis_limit.vista ANL003 "age=18, guardian.visible=false, guardian.required=true"
 
 collision_dependencies="$($binary examples/choice_field_collision.vista --emit dependencies 2>&1)"
 collision_status=$?

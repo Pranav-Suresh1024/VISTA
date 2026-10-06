@@ -154,18 +154,6 @@ IrExpression boolean(bool value) {
     return {ExpressionKind::BooleanLiteral, ValueType::Boolean, value ? "true" : "false", {}, false};
 }
 
-IrExpression lower(const Expression* expression, const SemanticResult& semantics,
-                   const std::map<std::string, std::string>& names) {
-    if (expression == nullptr) return boolean(true);
-    const auto& info = semantics.expressions.at(expression);
-    IrExpression lowered{expression->kind, info.type, expression->value, {}, info.choice_literal};
-    if (expression->kind == ExpressionKind::Name && !info.choice_literal)
-        lowered.value = names.at(info.referenced_field);
-    if (expression->left) lowered.operands.push_back(lower(expression->left, semantics, names));
-    if (expression->right) lowered.operands.push_back(lower(expression->right, semantics, names));
-    return lowered;
-}
-
 void combine(IrExpression& aggregate, IrExpression condition, const std::string& operation) {
     const std::string identity = operation == "and" ? "true" : "false";
     if (aggregate.kind == ExpressionKind::BooleanLiteral && aggregate.value == identity) {
@@ -231,7 +219,7 @@ LinkedModule lower_module(const std::string& alias, const LoadedModule& loaded) 
     linked.source_sha256 = loaded.object.source_sha256;
     linked.object_sha256 = loaded.object.object_sha256;
     linked.entry_rule_id = alias + ".entry";
-    linked.entry = lower(loaded.parsed.module->enter_condition, loaded.semantics, loaded.names);
+    linked.entry = lower_expression(loaded.parsed.module->enter_condition, loaded.semantics, loaded.names);
     for (const auto& import : loaded.object.imports) {
         const auto* symbol = loaded.semantics.symbols.find(import.alias);
         linked.imports.push_back({alias + "." + import.alias, loaded.names.at(import.alias),
@@ -241,7 +229,7 @@ LinkedModule lower_module(const std::string& alias, const LoadedModule& loaded) 
     unsigned check_index = 0;
     for (const auto* declaration : loaded.parsed.module->declarations) {
         if (declaration->kind == DeclarationKind::Check) {
-            linked.checks.push_back({lower(declaration->check->condition, loaded.semantics, loaded.names),
+            linked.checks.push_back({lower_expression(declaration->check->condition, loaded.semantics, loaded.names),
                                      declaration->check->message, alias + ".check." + std::to_string(++check_index)});
             continue;
         }
@@ -260,9 +248,9 @@ LinkedModule lower_module(const std::string& alias, const LoadedModule& loaded) 
                 case PropertyKind::Placeholder: lowered.placeholder = property->text; break;
                 case PropertyKind::Required: combine(lowered.requiredness, boolean(true), "or"); break;
                 case PropertyKind::ShowWhen:
-                    combine(lowered.visibility, lower(property->condition, loaded.semantics, loaded.names), "and"); break;
+                    combine(lowered.visibility, lower_expression(property->condition, loaded.semantics, loaded.names), "and"); break;
                 case PropertyKind::RequiredWhen:
-                    combine(lowered.requiredness, lower(property->condition, loaded.semantics, loaded.names), "or"); break;
+                    combine(lowered.requiredness, lower_expression(property->condition, loaded.semantics, loaded.names), "or"); break;
                 default:
                     lowered.constraints.push_back({property->kind, property->text,
                         lowered.qualified_name + "." + constraint_name(property->kind)});
@@ -322,6 +310,18 @@ std::string workflow_prefix(const LinkedWorkflow& workflow) {
 }
 
 }  // namespace
+
+IrExpression lower_expression(const Expression* expression, const SemanticResult& semantics,
+                              const std::map<std::string, std::string>& names) {
+    if (expression == nullptr) return boolean(true);
+    const auto& info = semantics.expressions.at(expression);
+    IrExpression lowered{expression->kind, info.type, expression->value, {}, info.choice_literal};
+    if (expression->kind == ExpressionKind::Name && !info.choice_literal)
+        lowered.value = names.at(info.referenced_field);
+    if (expression->left) lowered.operands.push_back(lower_expression(expression->left, semantics, names));
+    if (expression->right) lowered.operands.push_back(lower_expression(expression->right, semantics, names));
+    return lowered;
+}
 
 LinkResult link_workflow(const WorkflowAst& ast, const std::filesystem::path& workflow_path) {
     LinkResult result;
@@ -416,7 +416,7 @@ LinkResult link_workflow(const WorkflowAst& ast, const std::filesystem::path& wo
             result.diagnostics.push_back({diagnostic.code == "SEM002" ? "LNK002" : "LNK003",
                                           "route: " + diagnostic.message, diagnostic.line, diagnostic.column});
         if (!semantics.succeeded()) continue;
-        auto condition = lower(route->condition, semantics, route_names);
+        auto condition = lower_expression(route->condition, semantics, route_names);
         const std::string identity = route->source + " -> " + route->destination + " " + expression_text(condition);
         result.workflow.routes.push_back({route->source, route->destination, std::move(condition),
             ast.name + ".route." + sha256_hex(identity) + "." +

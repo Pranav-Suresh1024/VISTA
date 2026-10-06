@@ -1,0 +1,7 @@
+workflow ConditionalCycle {
+  use "applicant.vista" as First
+  use "applicant.vista" as Second
+  start First
+  route First -> Second when First.category == reserved
+  route Second -> First when Second.category == reserved
+}

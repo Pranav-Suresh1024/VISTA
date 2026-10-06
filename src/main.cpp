@@ -13,6 +13,7 @@
 #include "diagnostic.hpp"
 #include "module.hpp"
 #include "linker.hpp"
+#include "partition.hpp"
 #include "parser.hpp"
 #include "scanner.hpp"
 #include "semantic.hpp"
@@ -43,6 +44,7 @@ void print_help(std::ostream& output) {
            << "  --emit all --out-dir DIR   Write every demonstration artifact\n"
            << "  --emit module --out-dir DIR  Compile a deterministic module object\n"
            << "  --emit linked --out-dir DIR  Link a typed workflow to workflow.ir\n"
+           << "  --emit partitions  Derive exact classes and reachable workflow cases\n"
            << "  --validate-data FILE  Validate supplied field values in the CLI\n";
 }
 
@@ -233,7 +235,7 @@ int main(int argc, char* argv[]) {
     const bool known_mode =
         emit_mode == "tokens" || emit_mode == "ast" || emit_mode == "symbols" ||
         emit_mode == "dependencies" || emit_mode == "graph" ||
-        emit_mode == "diagnostics" || directory_mode;
+        emit_mode == "diagnostics" || emit_mode == "partitions" || directory_mode;
     if (!validation_mode && !known_mode) {
         std::cerr << "VISTA: unknown emit mode '" << emit_mode << "'\n";
         return 2;
@@ -303,14 +305,20 @@ int main(int argc, char* argv[]) {
         std::cout << ast_text;
         return 0;
     }
-    if (linked_mode) {
+    if (linked_mode || emit_mode == "partitions") {
         if (parse_result.workflow == nullptr) {
-            std::cerr << "VISTA: --emit linked requires a workflow source\n";
+            std::cerr << "VISTA: --emit " << emit_mode << " requires a workflow source\n";
             return 2;
         }
         const auto linked = vista::link_workflow(*parse_result.workflow, source_path);
         print_diagnostics(source_path, linked.diagnostics);
         if (!linked.succeeded()) return 1;
+        if (emit_mode == "partitions") {
+            const auto partitions = vista::derive_partitions(linked.workflow);
+            const auto suite = vista::enumerate_route_cases(linked.workflow, partitions);
+            std::cout << vista::format_partitions(partitions, suite);
+            return suite.complete() ? 0 : 1;
+        }
         if (!write_artifact(output_directory, "workflow.ir", vista::format_linked_workflow(linked.workflow))) return 2;
         std::cout << "Generated " << (output_directory / "workflow.ir").string() << '\n';
         return 0;

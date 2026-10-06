@@ -1,0 +1,13 @@
+module AllTypes {
+  field integer_value: integer { label "Integer" }
+  field decimal_value: decimal { label "Decimal" }
+  field date_value: date { label "Date" }
+  field boolean_value: boolean { label "Boolean" }
+  field choice_value: choice { first, second } { label "Choice" }
+  field text_value: text { label "Text" }
+  field textarea_value: textarea { label "Textarea" }
+  field email_value: email { label "Email" }
+  field phone_value: phone { label "Phone" }
+  field file_value: file { label "File" }
+  export boolean_value
+}

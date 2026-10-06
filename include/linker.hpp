@@ -2,6 +2,7 @@
 #define VISTA_LINKER_HPP
 
 #include <filesystem>
+#include <map>
 #include "workflow.hpp"
 
 namespace vista {
@@ -15,6 +16,8 @@ struct LinkResult {
 LinkResult link_workflow(const WorkflowAst& workflow,
                          const std::filesystem::path& workflow_path);
 std::string format_linked_workflow(const LinkedWorkflow& workflow);
+IrExpression lower_expression(const Expression*, const SemanticResult&,
+                              const std::map<std::string, std::string>& qualified_names);
 
 }  // namespace vista
 #endif

@@ -1,0 +1,6 @@
+workflow AllTypeRoutes {
+  use "all_type_routes.vista" as AllTypes
+  use "applicant.vista" as Finish
+  start AllTypes
+  route AllTypes -> Finish when AllTypes.boolean_value
+}
