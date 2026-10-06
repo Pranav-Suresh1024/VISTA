@@ -17,7 +17,7 @@ expect_contains() {
 }
 
 version_output="$($binary --version)"
-expect_contains "$version_output" "VISTA 0.7.0" "version output"
+expect_contains "$version_output" "VISTA 0.8.0" "version output"
 
 $binary --help extra >/dev/null 2>&1
 if [[ $? -ne 2 ]]; then

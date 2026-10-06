@@ -10,6 +10,8 @@
 #include "analysis.hpp"
 #include "ast.hpp"
 #include "codegen.hpp"
+#include "certify.hpp"
+#include "hash.hpp"
 #include "diagnostic.hpp"
 #include "module.hpp"
 #include "linker.hpp"
@@ -26,7 +28,8 @@ namespace {
 void print_help(std::ostream& output) {
     output << "VISTA - Validation and Interface Specification Translation Analyzer\n\n"
            << "Usage: vista <source.vista> --emit <tokens|ast|symbols|dependencies|graph|diagnostics>\n"
-           << "       vista <source.vista> --emit <html|all|module|linked|workflow> --out-dir <directory>\n"
+           << "       vista <source.vista> --emit <html|all|module|linked|workflow|certificate> --out-dir <directory>\n"
+           << "       vista <workflow.vista> --emit certificate --out-dir DIR [--javascript FILE]\n"
            << "       vista <source.vista> --validate-data <values.data>\n"
            << "       vista --list-templates\n"
            << "       vista [option]\n\n"
@@ -45,6 +48,7 @@ void print_help(std::ostream& output) {
            << "  --emit module --out-dir DIR  Compile a deterministic module object\n"
            << "  --emit linked --out-dir DIR  Link a typed workflow to workflow.ir\n"
            << "  --emit workflow --out-dir DIR  Generate workflow IR, HTML and JavaScript\n"
+           << "  --emit certificate --out-dir DIR  Execute both targets and record conformance evidence\n"
            << "  --emit partitions  Derive exact classes and reachable workflow cases\n"
            << "  --validate-data FILE  Validate supplied field values in the CLI\n";
 }
@@ -159,6 +163,17 @@ bool clear_workflow_artifacts(const std::filesystem::path& directory) {
     return cleared;
 }
 
+bool read_bytes(const std::filesystem::path& path, std::string& content) {
+    if (path.string().find('\0') != std::string::npos) {
+        std::cerr << "VISTA: NUL in input path\n"; return false;
+    }
+    std::ifstream input(path, std::ios::binary);
+    if (!input) { std::cerr << "VISTA: cannot read input '" << path.string() << "'\n"; return false; }
+    content.assign(std::istreambuf_iterator<char>(input), std::istreambuf_iterator<char>());
+    if (input.bad()) { std::cerr << "VISTA: failed reading input '" << path.string() << "'\n"; return false; }
+    return true;
+}
+
 bool clear_generated_artifacts(const std::filesystem::path& directory,
                                bool all_mode,
                                bool module_mode) {
@@ -229,7 +244,7 @@ int main(int argc, char* argv[]) {
     const bool validation_mode =
         argc == 4 && std::string(argv[2]) == "--validate-data";
     if (!validation_mode &&
-        ((argc != 4 && argc != 6) || std::string(argv[2]) != "--emit")) {
+        ((argc != 4 && argc != 6 && argc != 8) || std::string(argv[2]) != "--emit")) {
         std::cerr << "VISTA: invalid command-line arguments\n"
                   << "Run 'vista --help' to see the available options.\n";
         return 2;
@@ -239,8 +254,10 @@ int main(int argc, char* argv[]) {
     const bool module_mode = emit_mode == "module";
     const bool linked_mode = emit_mode == "linked";
     const bool workflow_mode = emit_mode == "workflow";
+    const bool certificate_mode = emit_mode == "certificate";
+    const bool supplied_javascript = certificate_mode && argc == 8 && std::string(argv[6]) == "--javascript" && !std::string(argv[7]).empty();
     const bool directory_mode = emit_mode == "html" || emit_mode == "all" ||
-                                module_mode || linked_mode || workflow_mode;
+                                module_mode || linked_mode || workflow_mode || certificate_mode;
     const bool known_mode =
         emit_mode == "tokens" || emit_mode == "ast" || emit_mode == "symbols" ||
         emit_mode == "dependencies" || emit_mode == "graph" ||
@@ -250,7 +267,7 @@ int main(int argc, char* argv[]) {
         return 2;
     }
     if (!validation_mode && ((directory_mode &&
-          (argc != 6 || std::string(argv[4]) != "--out-dir" ||
+          ((argc != 6 && !supplied_javascript) || std::string(argv[4]) != "--out-dir" ||
            std::string(argv[5]).empty())) ||
         (!directory_mode && argc != 4))) {
         std::cerr << "VISTA: invalid command-line arguments\n"
@@ -260,9 +277,28 @@ int main(int argc, char* argv[]) {
 
     const bool all_mode = emit_mode == "all";
     const std::filesystem::path output_directory = directory_mode ? argv[5] : "";
+    std::string exact_javascript, workflow_source_bytes;
+    if (certificate_mode) {
+        // Protect the supplied target from cleanup, including output/workflow.js aliases.
+        // Reject workflow source overlap before removing any named artifact.
+        for (const auto* file : {"workflow.ir", "workflow.html", "workflow.js", "workflow.vcert", "probe.js", "probe.out", "probe.err"}) {
+            std::error_code error;
+            if (std::filesystem::absolute(source_path).lexically_normal() == std::filesystem::absolute(output_directory/file).lexically_normal() ||
+                std::filesystem::equivalent(source_path, output_directory/file, error)) {
+                std::cerr << "VISTA: workflow input overlaps certificate output\n"; return 2;
+            }
+        }
+        if (supplied_javascript && !read_bytes(argv[7],exact_javascript)) {
+            remove_artifact(output_directory,"workflow.vcert"); return 2;
+        }
+        if (!read_bytes(source_path,workflow_source_bytes)) {
+            remove_artifact(output_directory,"workflow.vcert"); return 2;
+        }
+    }
     if (directory_mode) {
         if (!prepare_output_directory(output_directory) ||
-            !(workflow_mode ? clear_workflow_artifacts(output_directory) :
+            !(certificate_mode ? (remove_artifact(output_directory,"workflow.vcert") && clear_workflow_artifacts(output_directory)) :
+              workflow_mode ? clear_workflow_artifacts(output_directory) :
               linked_mode ? remove_artifact(output_directory, "workflow.ir") :
               clear_generated_artifacts(output_directory, all_mode, module_mode))) {
             return 2;
@@ -315,10 +351,21 @@ int main(int argc, char* argv[]) {
         std::cout << ast_text;
         return 0;
     }
-    if (linked_mode || workflow_mode || emit_mode == "partitions") {
+    if (linked_mode || workflow_mode || certificate_mode || emit_mode == "partitions") {
         if (parse_result.workflow == nullptr) {
             std::cerr << "VISTA: --emit " << emit_mode << " requires a workflow source\n";
             return 2;
+        }
+        std::vector<vista::ArtifactEvidence> source_artifacts;
+        if (certificate_mode) {
+            source_artifacts.push_back({"workflow-source",std::filesystem::absolute(source_path).lexically_normal().string(),vista::sha256_hex(workflow_source_bytes)});
+            for (const auto* use : parse_result.workflow->uses) {
+                const auto path = std::filesystem::path(source_path).parent_path()/use->source_path;
+                std::string bytes;
+                if (!read_bytes(path,bytes)) return 2;
+                source_artifacts.push_back({(path.extension() == ".vobj" ? "module-object." : "module-source.")+use->alias,
+                    std::filesystem::absolute(path).lexically_normal().string(),vista::sha256_hex(bytes)});
+            }
         }
         const auto linked = vista::link_workflow(*parse_result.workflow, source_path);
         print_diagnostics(source_path, linked.diagnostics);
@@ -329,8 +376,8 @@ int main(int argc, char* argv[]) {
             std::cout << vista::format_partitions(partitions, suite);
             return suite.complete() ? 0 : 1;
         }
-        if (workflow_mode) {
-            const auto javascript = vista::generate_workflow_javascript(linked.workflow);
+        if (workflow_mode || certificate_mode) {
+            const auto javascript = supplied_javascript ? exact_javascript : vista::generate_workflow_javascript(linked.workflow);
             const auto html = vista::generate_workflow_html(linked.workflow, javascript);
             const auto ir = vista::format_linked_workflow(linked.workflow);
             if (!write_artifact(output_directory, "workflow.ir", ir) ||
@@ -338,6 +385,23 @@ int main(int argc, char* argv[]) {
                 !write_artifact(output_directory, "workflow.html", html)) {
                 clear_workflow_artifacts(output_directory);
                 return 2;
+            }
+            if (certificate_mode) {
+                const auto partitions = vista::derive_partitions(linked.workflow);
+                const auto suite = vista::enumerate_route_cases(linked.workflow,partitions);
+                auto result = vista::certify_workflow(linked.workflow,suite,javascript,output_directory);
+                print_diagnostics(source_path,result.diagnostics);
+                for (const auto& d : result.diagnostics) if (d.code == "CERT006") return 2;
+                auto& certificate = result.certificate;
+                certificate.artifacts.insert(certificate.artifacts.end(),source_artifacts.begin(),source_artifacts.end());
+                certificate.artifacts.push_back({"workflow-ir","workflow.ir",vista::sha256_hex(ir)});
+                certificate.artifacts.push_back({"html","workflow.html",vista::sha256_hex(html)});
+                if (!write_artifact(output_directory,"workflow.vcert",vista::serialize_certificate(certificate))) {
+                    remove_artifact(output_directory,"workflow.vcert"); return 2;
+                }
+                std::cout << "Certificate " << (result.succeeded() ? "PASS" : certificate.status == vista::CertificateStatus::Unsupported ? "UNSUPPORTED" : "FAIL")
+                          << " in " << (output_directory/"workflow.vcert").string() << '\n';
+                return result.succeeded() ? 0 : 1;
             }
             std::cout << "Generated workflow output in " << output_directory.string() << '\n';
             return 0;

@@ -1,10 +1,10 @@
-# VISTA executable flow — accepted Task 6 checkpoint
+# VISTA executable flow — Task 7 implementation checkpoint
 
-Verified against `c292b60eec92cead5f203241145c3b5f64b86ef6` on `codex/vista-link`, 2026-10-06. [include/version.hpp](include/version.hpp) reports **0.7.0**. [decisions.md](decisions.md) records rationale and retrospective checkpoint provenance. This document describes current calls and the values passed between them, not planned certificate flows.
+Accepted Tasks 1–6 were verified at `c292b60eec92cead5f203241145c3b5f64b86ef6`; this Task 7 implementation starts from `3130c4a0fd24c7042e43a852603c22df60dbfdb1` on `codex/vista-link`, 2026-10-06. [include/version.hpp](include/version.hpp) now reports **0.8.0**. Controller acceptance of Task 7 is separate. [decisions.md](decisions.md) records rationale and checkpoint provenance.
 
 ## CLI dispatch and shared parsing
 
-[src/main.cpp](src/main.cpp), `main`, handles `--help`, `--version` and `--list-templates` before source loading. Otherwise it accepts `vista SOURCE --emit MODE` or `vista SOURCE --validate-data FILE`. `--out-dir DIR` is required only for `html`, `all`, `module`, `linked` and `workflow`; console modes are `tokens`, `ast`, `symbols`, `dependencies`, `graph`, `diagnostics` and `partitions`. There is no module-step CLI flag: step evaluation is a C++/generated-JS API.
+[src/main.cpp](src/main.cpp), `main`, handles `--help`, `--version` and `--list-templates` before source loading. Otherwise it accepts `vista SOURCE --emit MODE` or `vista SOURCE --validate-data FILE`. `--out-dir DIR` is required for `html`, `all`, `module`, `linked`, `workflow` and `certificate`; console modes are `tokens`, `ast`, `symbols`, `dependencies`, `graph`, `diagnostics` and `partitions`. Certificate mode also accepts `--javascript FILE`. There is no module-step CLI flag: step evaluation is a C++/generated-JS API.
 
 ```text
 main
@@ -198,12 +198,12 @@ The submit handler prevents native submission, evaluates the current step, and o
 
 ## Test entry points and evidence boundary
 
-[Makefile](Makefile) builds `build/vista` with C++17, Flex and Bison. Its existing shell tests require the POSIX build/test environment; documentation committing uses native Windows Git. No compiler suite was rerun for this docs-only change.
+[Makefile](Makefile) builds `build/vista` with C++17, Flex and Bison. Its shell tests require the POSIX build/test environment; committing uses native Windows Git. Task 7's local report records current final gates; the accepted Task 6 counts below remain historical provenance.
 
 | Entry point | Current execution |
 | --- | --- |
 | `make test` | Node-free: scalar unit check; scanner/parser; VISTA-Link parser/module/linker/evaluator/partition; semantic/analysis; legacy codegen/Phase 2/templates/validation/pipeline scripts |
-| `make test-vista-link-targets` | Explicit Node-dependent [tests/test_vista_link_codegen.sh](tests/test_vista_link_codegen.sh); depends on the compiler target |
+| `make test-vista-link-targets` | Explicit Node-dependent [tests/test_vista_link_codegen.sh](tests/test_vista_link_codegen.sh) and [tests/test_vista_link_certificate.sh](tests/test_vista_link_certificate.sh); depends on the compiler target |
 | Focused VISTA-Link checks | `bash tests/test_vista_link_parser.sh`, `test_vista_link_module.sh`, `test_vista_link_linker.sh`, `test_vista_link_evaluator.sh`, `test_vista_link_partition.sh`, or `test_vista_link_codegen.sh` using the same `tests/` prefix |
 | Unit entry points | `make test-hash-unit`, `make test-evaluator-scalar`; partition shell test builds/runs `build/test-partition-unit` |
 
@@ -211,4 +211,38 @@ The generated-target script emits real artifacts, compiles a temporary C++ probe
 
 ## Planned, not implemented at this checkpoint
 
-Tasks 7–9: certificate generation, an independent checker and mutation demonstration. There is no implemented certificate/checker/mutation pipeline or public certificate CLI to trace here. Existing `CERT001`–`CERT003` diagnostics describe partition incompleteness, not certificate artifacts. Current module hashes lack input-path metadata; future identity coordination belongs to the controller. Unsigned hashes are not authenticity, and finite VISTA-derived comparisons do not prove arbitrary JavaScript equivalent for every input.
+Tasks 8–9 remain planned: an independent checker and mutation demonstration. No independent verification executable is implemented here. Unsigned hashes are not authenticity, and finite VISTA-derived comparisons do not prove arbitrary JavaScript equivalent for every input.
+
+## Task 7 certificate flow
+
+```text
+main, --emit certificate --out-dir DIR [--javascript FILE]
+  reject workflow input/output overlap
+  read exact supplied JavaScript and workflow bytes before cleanup
+  prepare directory -> remove stale vcert and workflow artifacts
+  scan / parse -> read raw named module inputs -> link_workflow
+  choose supplied bytes or generate_workflow_javascript
+  generate_workflow_html -> format_linked_workflow
+  write workflow.ir / workflow.js / workflow.html
+  derive_partitions -> enumerate_route_cases
+  certify_workflow                                  [src/certify.cpp]
+    independently derive expected suite; validate completeness and identities
+    retain scalar/component IDs, expected counts, canonical module hashes
+    write exact workflow.js + deterministic probe.js
+    one shell-quoted node batch -> probe.out / probe.err
+      read target via raw Buffer path -> execute exported evaluator
+      hex values -> Latin-1 -> vistaEvaluate(input, active?, byte mode)
+      vistaCanonicalObservation -> case ID + hex observation
+    validate all output IDs/counts/count-wire structure
+    evaluate_workflow[_step] -> canonical_observation -> hash actual bytes
+    first shortest-prefix mismatch -> sorted assignment deletion
+      retain original state/prefix (whole: identical complete trace)
+      probe candidates, retain only reproducing disagreements
+    record witness + both canonical observations; coverage digest
+  add absolute raw source/module paths and relative raw IR/HTML identities
+  serialize_certificate                            [src/certificate.cpp]
+  write workflow.vcert: PASS exit 0; mismatch/incomplete exit 1
+  operational CERT006: exit 2, no final certificate
+```
+
+Input evidence is an ASCII hex wire containing whole/step mode, active module, counted prefix and sorted assignments. The certificate codec percent-encodes free text, sorts module/artifact/partition/case records and validates round-trip canonical syntax, unique identities, declared counts and input/coverage hashes. It links only certificate/hash/diagnostic code. `artifact` hashes raw files; canonical workflow prefix and canonical module hashes are separate. Generated sibling paths resolve relative to the certificate; absolute input paths preserve output-directory-independent identity, including non-UTF-8 bytes. Operational failures retain useful probe errors but clear the final certificate. Writes and input reads are not atomic; no runtime timeout is implemented. CERT001/CERT003 yield UNSUPPORTED; CERT002 cycle incompleteness yields FAIL with that diagnostic. This flow records finite source-derived agreement, not authenticity or arbitrary-JavaScript equivalence.
