@@ -1,6 +1,7 @@
 #ifndef VISTA_CERTIFICATE_HPP
 #define VISTA_CERTIFICATE_HPP
 #include <string>
+#include <filesystem>
 #include <string_view>
 #include <utility>
 #include <vector>
@@ -30,6 +31,8 @@ struct Certificate {
     std::vector<CaseEvidence> cases;
     std::string counterexample, counterexample_cli, counterexample_javascript;
     std::string unsupported_rule;
+    // Read context only; never serialized. Caller sets the certificate's parent.
+    std::filesystem::path certificate_directory;
 };
 struct CertificateParseResult {
     Certificate certificate;
@@ -41,5 +44,12 @@ struct CertificateParseResult {
 std::string certificate_coverage_sha256(const Certificate&);
 std::string serialize_certificate(const Certificate&);
 CertificateParseResult parse_certificate(std::string_view);
+struct CertificateVerification {
+    bool verified = false;
+    std::vector<Diagnostic> diagnostics;
+    std::string coverage_sha256, workflow_sha256, javascript_sha256;
+    std::vector<std::pair<std::string, std::string>> artifact_sha256;
+};
+CertificateVerification verify_certificate(const Certificate&, const std::filesystem::path* root);
 }  // namespace vista
 #endif

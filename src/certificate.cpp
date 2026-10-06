@@ -2,6 +2,9 @@
 #include "hash.hpp"
 #include <algorithm>
 #include <charconv>
+#include <fstream>
+#include <iterator>
+#include <map>
 #include <set>
 #include <sstream>
 #include <stdexcept>
@@ -173,6 +176,166 @@ CertificateParseResult parse_certificate(std::string_view bytes) {
     } catch (const std::exception& e) {
         result.diagnostics.push_back({"CERT005", e.what(), 1, 1});
     }
+    return result;
+}
+namespace {
+std::string unhex(const std::string& s) {
+    if (s.size() % 2 || s.find_first_not_of("0123456789abcdef") != std::string::npos)
+        throw std::runtime_error("invalid case input hex");
+    auto value = [](char c) { return c <= '9' ? c-'0' : c-'a'+10; };
+    std::string out;
+    for (std::size_t i = 0; i < s.size(); i += 2) out += static_cast<char>(value(s[i])*16+value(s[i+1]));
+    return out;
+}
+// Validate the recorded state/count wire, without evaluating source semantics.
+void verify_input(const CaseEvidence& e, const std::set<std::string>& aliases) {
+    std::istringstream in(e.input);
+    auto line = [&]() { std::string s; if (!std::getline(in,s)) throw std::runtime_error("truncated case input"); return s; };
+    auto field = [&](const std::string& key) {
+        const auto s = line();
+        if (s.rfind(key+' ',0) != 0) throw std::runtime_error("invalid case input record");
+        return s.substr(key.size()+1);
+    };
+    auto input_count = [&](const std::string& key) {
+        const auto text = field(key); const auto n = count(text);
+        if (text != std::to_string(n) || n > e.input.size()) throw std::runtime_error("noncanonical case input count");
+        return n;
+    };
+    const auto mode = field("mode"), active = unhex(field("active"));
+    if ((mode == "whole" && !active.empty()) || (mode == "step" && !aliases.count(active)) ||
+        (mode != "whole" && mode != "step")) throw std::runtime_error("invalid case state mode");
+    auto n = input_count("prefix-count");
+    std::string destination;
+    for (std::size_t i = 0; i < n; ++i) {
+        const auto route = unhex(field("prefix")); const auto at = route.find("->");
+        if (at == std::string::npos || !aliases.count(route.substr(0,at)) || !aliases.count(route.substr(at+2)) ||
+            (i && route.substr(0,at) != destination)) throw std::runtime_error("invalid recorded route prefix");
+        destination = route.substr(at+2);
+    }
+    if (mode == "step" && n && destination != active) throw std::runtime_error("prefix/state mismatch");
+    n = input_count("assignment-count");
+    std::string previous;
+    for (std::size_t i = 0; i < n; ++i) {
+        const auto s = field("input"); const auto at = s.find(' ');
+        if (at == std::string::npos) throw std::runtime_error("invalid assignment");
+        const auto name = unhex(s.substr(0,at)); unhex(s.substr(at+1));
+        if (name.empty() || (i && name <= previous) || !aliases.count(name.substr(0,name.find('.'))))
+            throw std::runtime_error("invalid assignment identity");
+        previous = name;
+    }
+    if (in.peek() != std::char_traits<char>::eof() || e.input.empty() || e.input.back() != '\n')
+        throw std::runtime_error("trailing or unterminated case input");
+}
+std::string read_artifact(const std::filesystem::path& path) {
+    std::ifstream in(path,std::ios::binary);
+    if (!in) throw std::runtime_error("cannot read artifact '"+path.string()+"'");
+    std::string bytes{std::istreambuf_iterator<char>(in),{}};
+    if (in.bad()) throw std::runtime_error("failed reading artifact");
+    return bytes;
+}
+std::string normalized_source(const std::string& bytes) {
+    std::string out;
+    for (std::size_t i = 0; i < bytes.size(); ++i) {
+        out += bytes[i] == '\r' ? '\n' : bytes[i];
+        if (bytes[i] == '\r' && i+1 < bytes.size() && bytes[i+1] == '\n') ++i;
+    }
+    return out;
+}
+}  // namespace
+
+CertificateVerification verify_certificate(const Certificate& c, const std::filesystem::path* root) {
+    CertificateVerification result;
+    try {
+        // Reuse the strict codec also for direct API callers with constructed values.
+        const auto parsed = parse_certificate(serialize_certificate(c));
+        if (!parsed.succeeded()) throw std::runtime_error(parsed.diagnostics.front().message);
+        if (c.status != CertificateStatus::Pass) throw std::runtime_error("certificate is not PASS");
+        if (!c.counterexample_cli.empty() || !c.counterexample_javascript.empty()) throw std::runtime_error("PASS contains counterexample observations");
+        result.coverage_sha256 = certificate_coverage_sha256(c);
+        std::map<std::string,std::string> modules(c.module_hashes.begin(),c.module_hashes.end());
+        std::set<std::string> aliases;
+        for (const auto& m : modules) {
+            if (m.first.size() > 7 && m.first.compare(m.first.size()-7,7,".source") == 0) aliases.insert(m.first.substr(0,m.first.size()-7));
+        }
+        if (aliases.empty() || modules.size() != aliases.size()*2) throw std::runtime_error("incomplete module identities");
+        std::set<std::string> roles{"workflow-source","workflow-ir","javascript","html"};
+        std::map<std::string,ArtifactEvidence> artifacts;
+        for (const auto& a : c.artifacts) artifacts.emplace(a.role,a);
+        for (const auto& alias : aliases) {
+            if (!modules.count(alias+".object")) throw std::runtime_error("missing module object identity");
+            const auto source = "module-source."+alias, object = "module-object."+alias;
+            if (artifacts.count(source)+artifacts.count(object) != 1) throw std::runtime_error("missing or ambiguous module artifact");
+            roles.insert(artifacts.count(source) ? source : object);
+        }
+        if (roles.size() != artifacts.size()) throw std::runtime_error("unexpected artifact role");
+        for (const auto& role : roles) if (!artifacts.count(role)) throw std::runtime_error("missing artifact "+role);
+        if (artifacts.at("javascript").raw_sha256 != c.javascript_sha256) throw std::runtime_error("JavaScript aggregate mismatch");
+        for (const auto& e : c.cases) verify_input(e,aliases);
+        if (root) {
+            if (!std::filesystem::is_directory(*root)) throw std::runtime_error("root is not a project directory");
+            std::map<std::string,std::string> bytes;
+            for (const auto& a : c.artifacts) {
+                const std::filesystem::path recorded(a.path);
+                const bool generated = a.role == "workflow-ir" || a.role == "javascript" || a.role == "html";
+                if (generated == recorded.is_absolute()) throw std::runtime_error("invalid artifact path policy");
+                // Preserve exact filesystem spelling, particularly symlink/.. and raw bytes.
+                const auto path = generated ? c.certificate_directory/recorded : recorded;
+                bytes[a.role] = read_artifact(path);
+                const auto digest = sha256_hex(bytes.at(a.role));
+                result.artifact_sha256.emplace_back(a.role,digest);
+                if (digest != a.raw_sha256) throw std::runtime_error("changed artifact "+a.role);
+            }
+            result.javascript_sha256 = sha256_hex(bytes.at("javascript"));
+            const auto& ir = bytes.at("workflow-ir");
+            const auto at = ir.rfind("\nworkflow-sha256 ");
+            if (at == std::string::npos || ir.substr(at+1) != "workflow-sha256 "+c.workflow_sha256+"\n")
+                throw std::runtime_error("invalid workflow IR digest record");
+            result.workflow_sha256 = sha256_hex(std::string_view(ir).substr(0,at+1));
+            if (result.workflow_sha256 != c.workflow_sha256) throw std::runtime_error("workflow aggregate mismatch");
+            std::istringstream rows(ir.substr(0,at+1)); std::string row, alias, name, extra;
+            if (!std::getline(rows,row) || row != "VISTA-WORKFLOW 1" || !std::getline(rows,row) || row != "workflow "+c.workflow)
+                throw std::runtime_error("workflow IR identity mismatch");
+            std::set<std::string> seen;
+            while (std::getline(rows,row)) if (row.rfind("module ",0) == 0) {
+                std::istringstream header(row.substr(7));
+                if (!(header >> alias >> name) || (header >> extra) || !aliases.count(alias) || !seen.insert(alias).second)
+                    throw std::runtime_error("invalid IR module identity");
+                for (const auto& kind : {"source", "object"}) {
+                    if (!std::getline(rows,row) || row != std::string(kind)+"-sha256 "+modules.at(alias+"."+kind))
+                        throw std::runtime_error("IR/module semantic identity mismatch");
+                }
+            }
+            if (seen != aliases) throw std::runtime_error("incomplete IR module identities");
+            for (const auto& a : aliases) {
+                const auto source = bytes.find("module-source."+a);
+                if (source != bytes.end()) {
+                    if (sha256_hex(normalized_source(source->second)) != modules.at(a+".source"))
+                        throw std::runtime_error("module normalized source identity mismatch");
+                } else {
+                    const auto& object = bytes.at("module-object."+a);
+                    const auto end = object.rfind("\nobject-sha256 ");
+                    if (end == std::string::npos || object.substr(end+1) != "object-sha256 "+modules.at(a+".object")+"\n" ||
+                        sha256_hex(std::string_view(object).substr(0,end+1)) != modules.at(a+".object"))
+                        throw std::runtime_error("module object aggregate mismatch");
+                    // Inspect the counted embedded-source envelope only; no module compiler/loader.
+                    std::istringstream envelope(object.substr(0,end+1));
+                    if (!std::getline(envelope,row) || row != "VISTA-OBJECT 1" || !std::getline(envelope,row) || row.rfind("module ",0) != 0 ||
+                        !std::getline(envelope,row) || row != "source-sha256 "+modules.at(a+".source"))
+                        throw std::runtime_error("module object source identity mismatch");
+                    bool found = false;
+                    while (std::getline(envelope,row)) if (row.rfind("source-bytes ",0) == 0) {
+                        const auto n = count(row.substr(13)); const auto pos = static_cast<std::size_t>(envelope.tellg());
+                        if (pos > end || n != end-pos || object.substr(pos,n).find('\r') != std::string::npos ||
+                            sha256_hex(std::string_view(object).substr(pos,n)) != modules.at(a+".source"))
+                            throw std::runtime_error("stale embedded source identity");
+                        found = true; break;
+                    }
+                    if (!found) throw std::runtime_error("missing embedded source");
+                }
+            }
+        }
+        result.verified = true;
+    } catch (const std::exception& e) { result.diagnostics.push_back({"CERT005",e.what(),1,1}); }
     return result;
 }
 }  // namespace vista

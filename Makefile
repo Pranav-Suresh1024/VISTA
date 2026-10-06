@@ -14,7 +14,11 @@ HEADERS := include/analysis.hpp include/ast.hpp include/certificate.hpp include/
 
 .PHONY: all test test-vista-link-targets test-hash-unit test-evaluator-scalar demo clean
 
-all: $(TARGET)
+all: $(TARGET) build/vista-cert-check
+
+build/vista-cert-check: src/cert_check_main.cpp src/certificate.cpp src/hash.cpp src/diagnostic.cpp include/certificate.hpp include/hash.hpp include/diagnostic.hpp
+	@mkdir -p build
+	$(CXX) $(CXXFLAGS) src/cert_check_main.cpp src/certificate.cpp src/hash.cpp src/diagnostic.cpp -o $@
 
 $(GENERATED_SCANNER): src/vista.l $(HEADERS)
 	@mkdir -p build
@@ -46,7 +50,7 @@ test: $(TARGET)
 	@bash tests/test_validation.sh
 	@bash tests/test_pipeline.sh
 
-test-vista-link-targets: $(TARGET)
+test-vista-link-targets: $(TARGET) build/vista-cert-check
 	@bash tests/test_vista_link_codegen.sh
 	@bash tests/test_vista_link_certificate.sh
 

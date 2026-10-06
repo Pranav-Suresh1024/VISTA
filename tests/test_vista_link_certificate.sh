@@ -10,6 +10,20 @@ if ! "$binary" "$source" --emit certificate --out-dir "$tmp/first"; then
     echo 'FAIL: certificate emission unavailable'; exit 1
 fi
 for file in workflow.ir workflow.html workflow.js workflow.vcert; do test -s "$tmp/first/$file"; done
+checker=./build/vista-cert-check
+test -x "$checker" || { echo 'FAIL: independent checker unavailable'; exit 1; }
+"$checker" "$tmp/first/workflow.vcert" --root . | grep -q VERIFIED
+"$checker" "$tmp/first/workflow.vcert" | grep -q VERIFIED
+reject_certificate() {
+    local code=0
+    "$checker" "$@" > "$tmp/check.log" 2>&1 || code=$?
+    test "$code" = 1 || { cat "$tmp/check.log"; echo "FAIL: checker expected exit 1, got $code"; exit 1; }
+}
+reject_certificate examples/vista_link/errors/corrupt.vcert
+reject_certificate "$tmp/missing.vcert"
+reject_certificate "$tmp/first/workflow.vcert" --root "$tmp/missing-root"
+reject_certificate "$tmp/first/workflow.vcert" --unknown .
+env PATH="$tmp/no-runtime" "$checker" "$tmp/first/workflow.vcert" --root . | grep -q VERIFIED
 "$binary" "$source" --emit certificate --out-dir "$tmp/second"
 cmp "$tmp/first/workflow.vcert" "$tmp/second/workflow.vcert"
 node - "$tmp/first/workflow.vcert" <<'JS'
@@ -46,6 +60,7 @@ mkdir -p "$odd"
 cp examples/vista_link/{scholarship.workflow,applicant,certificate}.vista "$odd/"
 "$binary" "$odd/scholarship.workflow.vista" --emit certificate --out-dir "$odd/output's"
 grep -q '^status PASS$' "$odd/output's/workflow.vcert"
+"$checker" "$odd/output's/workflow.vcert" --root .
 # Lexical link/.. removal changes the file: the filesystem follows link first.
 # Reopen both recorded workflow and module paths, preserving their raw bytes.
 links="$odd/artifact-links"
@@ -79,6 +94,8 @@ for(const certificate of process.argv.slice(2)) {
 assert.deepEqual(failures,[],'recorded source paths must reopen the hashed input bytes');
 console.log('Symlink/.. workflow-source and module-source raw artifact hashes passed.');
 JS
+"$checker" "$tmp/workflow-link/workflow.vcert" --root .
+"$checker" "$tmp/module-link/workflow.vcert" --root .
 # Raw CRLF hash differs from the canonical source hash but is independently named.
 mkdir "$tmp/crlf-source"
 cp examples/vista_link/{scholarship.workflow,certificate}.vista "$tmp/crlf-source/"
@@ -91,6 +108,33 @@ const raw=crypto.createHash('sha256').update(fs.readFileSync(process.argv[3])).d
 assert(lines.some(l=>l.startsWith('artifact ')&&decodeURIComponent(l.split(' ')[1])==='module-source.Applicant'&&l.endsWith(' '+raw)));
 assert(!lines.includes('module-hash Applicant.source '+raw));
 JS
+"$checker" "$tmp/crlf/workflow.vcert" --root .
+cp "$tmp/crlf-source/applicant.vista" "$tmp/saved-source"
+printf '\nchanged\n' >> "$tmp/crlf-source/applicant.vista"
+reject_certificate "$tmp/crlf/workflow.vcert" --root .
+"$checker" "$tmp/crlf/workflow.vcert"
+mv "$tmp/saved-source" "$tmp/crlf-source/applicant.vista"
+mv "$tmp/crlf-source/applicant.vista" "$tmp/saved-source"
+reject_certificate "$tmp/crlf/workflow.vcert" --root .
+mv "$tmp/saved-source" "$tmp/crlf-source/applicant.vista"
+for artifact in workflow.ir workflow.js workflow.html; do
+    cp "$tmp/crlf/$artifact" "$tmp/saved-artifact"
+    printf 'changed\n' >> "$tmp/crlf/$artifact"
+    reject_certificate "$tmp/crlf/workflow.vcert" --root .
+    mv "$tmp/saved-artifact" "$tmp/crlf/$artifact"
+    mv "$tmp/crlf/$artifact" "$tmp/saved-artifact"
+    reject_certificate "$tmp/crlf/workflow.vcert" --root .
+    mv "$tmp/saved-artifact" "$tmp/crlf/$artifact"
+done
+for input in scholarship.workflow.vista certificate.vista; do
+    cp "$tmp/crlf-source/$input" "$tmp/saved-input"
+    printf 'changed\n' >> "$tmp/crlf-source/$input"
+    reject_certificate "$tmp/crlf/workflow.vcert" --root .
+    mv "$tmp/saved-input" "$tmp/crlf-source/$input"
+    mv "$tmp/crlf-source/$input" "$tmp/saved-input"
+    reject_certificate "$tmp/crlf/workflow.vcert" --root .
+    mv "$tmp/saved-input" "$tmp/crlf-source/$input"
+done
 expect_operational_failure() {
     local code=0
     "$@" > "$tmp/failure.log" 2>&1 || code=$?
@@ -161,6 +205,7 @@ code=0
 test "$code" = 1
 grep -q '^status UNSUPPORTED$' "$tmp/unsupported/workflow.vcert"
 grep -q '^coverage-complete 0$' "$tmp/unsupported/workflow.vcert"
+for directory in mismatch cycle unsupported; do reject_certificate "$tmp/$directory/workflow.vcert"; done
 # Independent codec link: no scanner, parser, linker, evaluator or partitioner.
 cat > "$tmp/codec.cpp" <<'CPP'
 #include "certificate.hpp"
@@ -174,6 +219,20 @@ int main(int argc,char** argv) {
     assert(argc>=4);
     auto pass=read(argv[1]); auto result=parse_certificate(pass); assert(result.succeeded());
     assert(serialize_certificate(result.certificate)==pass);
+    assert(verify_certificate(result.certificate,nullptr).verified);
+    const std::filesystem::path root=".";
+    result.certificate.certificate_directory=std::filesystem::path(argv[1]).parent_path();
+    assert(verify_certificate(result.certificate,&root).verified);
+    auto root_bad=result.certificate;root_bad.workflow_sha256=std::string(64,'0');assert(!verify_certificate(root_bad,&root).verified);
+    root_bad=result.certificate;root_bad.module_hashes[0].second=std::string(64,'0');assert(!verify_certificate(root_bad,&root).verified);
+    root_bad=result.certificate;root_bad.module_hashes[1].second=std::string(64,'0');assert(!verify_certificate(root_bad,&root).verified);
+    auto rejected=[&](Certificate c){assert(!verify_certificate(c,nullptr).verified);};
+    auto write_invalid=[&](const char* name,Certificate c){std::ofstream f(std::string(argv[1])+name);f<<serialize_certificate(c);rejected(c);};
+    auto bad=result.certificate;bad.cases[0].input="mode step\nactive \nprefix-count 0\nassignment-count 0\n";bad.cases[0].input_sha256=sha256_hex(bad.cases[0].input);bad.coverage_sha256=certificate_coverage_sha256(bad);write_invalid(".state",bad);
+    bad=result.certificate;bad.artifacts.erase(bad.artifacts.begin());write_invalid(".artifact",bad);
+    bad=result.certificate;bad.cases.erase(bad.cases.begin());write_invalid(".coverage",bad);
+    bad=result.certificate;bad.javascript_sha256=std::string(64,'0');write_invalid(".aggregate",bad);
+    bad=result.certificate;bad.cases[0].input.insert(bad.cases[0].input.find("prefix-count ")+13,"0");bad.cases[0].input_sha256=sha256_hex(bad.cases[0].input);bad.coverage_sha256=certificate_coverage_sha256(bad);write_invalid(".input-count",bad);
     for(int i=2;i<argc;++i) { auto s=read(argv[i]);auto p=parse_certificate(s);assert(p.succeeded());assert(serialize_certificate(p.certificate)==s);assert(p.certificate.status!=CertificateStatus::Pass); }
     auto invalid=[&](std::string s){assert(!parse_certificate(s).succeeded());};
     invalid(pass.substr(0,pass.size()-1)); invalid(pass+"garbage\n");
@@ -192,6 +251,22 @@ int main(int argc,char** argv) {
 CPP
 g++ -std=c++17 -Wall -Wextra -Werror -Iinclude "$tmp/codec.cpp" src/certificate.cpp src/hash.cpp src/diagnostic.cpp -o "$tmp/codec"
 "$tmp/codec" "$tmp/second/workflow.vcert" "$tmp/mismatch/workflow.vcert" "$tmp/cycle/workflow.vcert" "$tmp/unsupported/workflow.vcert"
+for suffix in state artifact coverage aggregate input-count; do reject_certificate "$tmp/second/workflow.vcert.$suffix"; done
+node - "$tmp/second/workflow.vcert" "$tmp" <<'JS'
+const fs=require('fs'),assert=require('assert');
+const original=fs.readFileSync(process.argv[2],'utf8');
+const change=(name,from,to)=>{assert(original.includes(from));const changed=original.replace(from,to);assert.notEqual(changed,original);fs.writeFileSync(process.argv[3]+'/'+name+'.vcert',changed);};
+change('version','VISTA-CERT 1','VISTA-CERT 2');
+change('count','case-count ','case-count 999');
+change('complete','coverage-complete 1','coverage-complete 0');
+change('digest',/coverage-sha256 [a-f0-9]{64}/.exec(original)[0],'coverage-sha256 '+'0'.repeat(64));
+change('duplicate',/^case (\S+) /m.exec(original)[0],/^case (\S+) /m.exec(original)[0].replace('case.0','case.1'));
+change('percent','workflow ScholarshipApplication','workflow %GG');
+const row=/^case \S+ [a-f0-9]{64} ([a-f0-9]{64})/m.exec(original);change('case-hash',row[0],row[0].slice(0,-64)+'0'.repeat(64));
+fs.writeFileSync(process.argv[3]+'/truncated.vcert',original.slice(0,-1));
+fs.writeFileSync(process.argv[3]+'/trailing.vcert',original+'junk\n');
+JS
+for variant in version count complete digest duplicate percent case-hash truncated trailing; do reject_certificate "$tmp/$variant.vcert"; done
 # A later-step mismatch may delete payloads, but must retain the reaching prefix.
 cp "$tmp/original.js" "$tmp/later.js"
 sed "s/active==='Applicant'/active==='Certificate'/" < <(tail -n 6 "$tmp/mutant.js") >> "$tmp/later.js"
@@ -237,17 +312,31 @@ assert(wire.startsWith('mode whole\nactive \nprefix-count 0\n'));
 assert(wire.includes('input '+Buffer.from('A.flag').toString('hex')+' '+Buffer.from('true').toString('hex')+'\n'));
 JS
 "$binary" examples/vista_link/all_type_routes.workflow.vista --emit certificate --out-dir "$tmp/all-types"
+"$checker" "$tmp/all-types/workflow.vcert" --root .
 grep -q '^status PASS$' "$tmp/all-types/workflow.vcert"
 "$tmp/codec" "$tmp/all-types/workflow.vcert" "$tmp/mismatch/workflow.vcert" "$tmp/cycle/workflow.vcert"
 mkdir "$tmp/object-source"
-"$binary" examples/vista_link/applicant.vista --emit module --out-dir "$tmp/object-source"
+"$binary" "$tmp/crlf-source/applicant.vista" --emit module --out-dir "$tmp/object-source"
 cp examples/vista_link/certificate.vista "$tmp/object-source/"
 sed 's/applicant.vista/module.vobj/' "$source" > "$tmp/object-source/main.vista"
 "$binary" "$tmp/object-source/main.vista" --emit certificate --out-dir "$tmp/object-cert"
+"$checker" "$tmp/object-cert/workflow.vcert" --root .
 "$tmp/codec" "$tmp/object-cert/workflow.vcert" "$tmp/mismatch/workflow.vcert" "$tmp/cycle/workflow.vcert"
 node - "$tmp/object-cert/workflow.vcert" "$tmp/object-source/module.vobj" <<'JS'
 const fs=require('fs'),assert=require('assert'),crypto=require('crypto');
 const raw=crypto.createHash('sha256').update(fs.readFileSync(process.argv[3])).digest('hex');
 assert(fs.readFileSync(process.argv[2],'utf8').split('\n').some(l=>l.startsWith('artifact ')&&decodeURIComponent(l.split(' ')[1])==='module-object.Applicant'&&l.endsWith(' '+raw)));
 JS
+cp "$tmp/object-source/module.vobj" "$tmp/saved-object"
+sed -i 's/label "Applicant category"/label "Changed!! category"/' "$tmp/object-source/module.vobj"
+test "$(wc -c < "$tmp/saved-object")" = "$(wc -c < "$tmp/object-source/module.vobj")"
+cmp -s "$tmp/saved-object" "$tmp/object-source/module.vobj" && { echo 'FAIL: stale object mutation did not apply'; exit 1; }
+reject_certificate "$tmp/object-cert/workflow.vcert" --root .
+code=0
+"$binary" "$tmp/object-source/main.vista" --emit certificate --out-dir "$tmp/stale-object" > "$tmp/stale.log" 2>&1 || code=$?
+test "$code" != 0
+grep -q MOD004 "$tmp/stale.log"
+test ! -e "$tmp/stale-object/workflow.vcert"
+mv "$tmp/object-source/module.vobj" "$tmp/missing-object"
+reject_certificate "$tmp/object-cert/workflow.vcert" --root .
 echo 'VISTA-Link certificate tests passed.'

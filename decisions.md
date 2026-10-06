@@ -84,9 +84,13 @@ Workflow output clears the three known stale artifacts before compilation and at
 
 ## Claim and future-work boundaries
 
+**Task 8, based on accepted `33bc128`.** `verify_certificate(const Certificate&, const std::filesystem::path*)` reuses the strict codec, checks complete whole/step counts, canonical counted case inputs and state/prefix identities, matching observation hashes, module/artifact role coverage and the coverage/JavaScript aggregates. Its result returns diagnostics and recomputed coverage, workflow, JavaScript and raw artifact digests. `Certificate::certificate_directory` is caller-supplied read context, excluded from the wire format. Ordinary `make all` builds `vista-cert-check` using only its main, certificate, hash and diagnostic sources.
+
+`vista-cert-check DIR/workflow.vcert --root .` additionally reopens every named raw input and generated artifact. The root must be an existing project directory and enables file verification; version 1 already records absolute source/object paths, so root does not relocate them or constrain reads beneath it. Generated paths resolve against the certificate parent. Reads preserve raw path bytes and filesystem-significant symlink/`..` spelling. Sources retain raw file hashes; CR/CRLF normalize to LF only for comparison with the module source semantic digest. Workflow semantic identity is the named IR prefix before its final digest record. Module source/object identities are cross-checked with IR headers; source inputs recompute normalized-source digests, object inputs check their digest envelope and counted embedded source. The checker does not rebuild a source module's object contract, parse workflow semantics, rerun partitions or execute either target. Without root it verifies recorded consistency only. Unsigned evidence and sequential reads remain unauthenticated and non-atomic. Earlier Task 7 descriptions of the future checker below are retained as historical rationale.
+
 There is no AI/ML component. Exact partition completeness is relative to supported VISTA predicates, validation semantics and successful bounded derivation. Finite source-derived comparisons do not prove arbitrary supplied JavaScript equivalent for every input or every browser interaction. Unsigned digest evidence can be regenerated and is not authenticity or tamper-proof execution evidence.
 
-Tasks 8–9 remain **planned, not implemented**: the independent checker and mutation demonstration. Task 7 supplies certificate generation and mutation regression fixtures; it does not supply a checker or claim independent verification.
+Task 8 implements independent certificate checking; Task 9's mutation demonstration remains planned. Task 7's certificate generation and mutation regression fixtures remain the evidence producer.
 
 ### 10. Execute the targets and retain independently addressable evidence
 
