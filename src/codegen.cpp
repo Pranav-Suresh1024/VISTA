@@ -671,11 +671,15 @@ function vistaExpression(e,scope) {
   const comparisons = {'==':order===0,'!=':order!==0,'<':order<0,'<=':order<=0,'>':order>0,'>=':order>=0};
   v.valid = Object.hasOwn(comparisons,text); v.boolean = v.valid && comparisons[text]; return v;
 }
+function vistaByteOrder(a,b) {
+  const left = vistaBytes(a), right = vistaBytes(b);
+  return left === right ? 0 : left < right ? -1 : 1;
+}
 function vistaNormalize(o) {
-  o.fields.sort((a,b)=>a.field < b.field ? -1 : a.field > b.field ? 1 : 0);
-  o.rule_ids = [...new Set(o.rule_ids)].sort(); o.diagnostic_codes.sort();
+  o.fields.sort((a,b)=>vistaByteOrder(a.field,b.field));
+  o.rule_ids = [...new Set(o.rule_ids)].sort(vistaByteOrder); o.diagnostic_codes.sort(vistaByteOrder);
   o.diagnostic_details.sort((a,b)=>{
-    for (const k of ['code','field','rule_id']) { if (a[k] < b[k]) return -1; if (a[k] > b[k]) return 1; } return 0;
+    for (const k of ['code','field','rule_id']) { const order = vistaByteOrder(a[k],b[k]); if (order) return order; } return 0;
   }); return o;
 }
 function vistaError(o,code,field='',rule_id='',message=code) {
@@ -692,7 +696,7 @@ function vistaStep(input,active) {
     for (const f of m.fields) all.set(f.name,vistaValue(f,input.get(f.name)));
     for (const name of m.exports) if (all.has(name)) exported.set(name,all.get(name));
   }
-  for (const name of [...input.keys()].sort()) if (!all.has(name)) vistaError(o,'VAL003',name,'',`Unknown field ${name}`);
+  for (const name of [...input.keys()].sort(vistaByteOrder)) if (!all.has(name)) vistaError(o,'VAL003',name,'',`Unknown field ${name}`);
   const m = vistaWorkflow.modules.find(m=>m.alias === active);
   if (!m) { vistaError(o,'LNK005','','',`Invalid active module ${active}`); return vistaNormalize(o); }
   const scope = new Map(m.fields.map(f=>[f.name,all.get(f.name)]));

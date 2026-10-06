@@ -76,6 +76,8 @@ int main(int argc,char** argv) {
     w.modules[0].checks.clear(); artifacts(w,root+"/plain");
     for(const auto& f:a.fields) for(const auto& v:values) probe(w,root+"/plain",{{f.qualified_name,v},{"A.f3","true"}});
     probe(w,root+"/plain",{{"unknown","x"}},"A"); probe(w,root+"/plain",{},"Unknown");
+    // UTF-16 places U+10000 before U+E000; C++ UTF-8 byte ordering reverses them.
+    probe(w,root+"/plain",{{u8"\U00010000","x"},{u8"\uE000","x"}},"A");
     for(const std::string relation:{"==","!=","<","<=",">",">="})
         w.modules[0].checks.push_back({op(relation,name("A.f1",ValueType::Integer),name("A.f2",ValueType::Decimal)),"Numeric relation", "A.numeric."+relation});
     w.modules[0].checks.push_back({{ExpressionKind::Unary,ValueType::Boolean,"present",{name("A.f6",ValueType::File)},false},"File present","A.present"});

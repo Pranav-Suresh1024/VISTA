@@ -12,7 +12,7 @@ GENERATED_PARSER_HEADER := build/vista_parser.hpp
 SOURCES := src/main.cpp src/analysis.cpp src/ast.cpp src/codegen.cpp src/diagnostic.cpp src/evaluator.cpp src/hash.cpp src/linker.cpp src/module.cpp src/parser.cpp src/partition.cpp src/semantic.cpp src/token.cpp src/validation.cpp
 HEADERS := include/analysis.hpp include/ast.hpp include/codegen.hpp include/diagnostic.hpp include/evaluator.hpp include/hash.hpp include/linker.hpp include/module.hpp include/parser.hpp include/partition.hpp include/scanner.hpp include/semantic.hpp include/token.hpp include/validation.hpp include/version.hpp include/workflow.hpp
 
-.PHONY: all test test-hash-unit test-evaluator-scalar demo clean
+.PHONY: all test test-vista-link-targets test-hash-unit test-evaluator-scalar demo clean
 
 all: $(TARGET)
 
@@ -38,7 +38,6 @@ test: $(TARGET)
 	@bash tests/test_vista_link_linker.sh
 	@bash tests/test_vista_link_evaluator.sh
 	@bash tests/test_vista_link_partition.sh
-	@bash tests/test_vista_link_codegen.sh
 	@bash tests/test_semantic.sh
 	@bash tests/test_analysis.sh
 	@bash tests/test_codegen.sh
@@ -46,6 +45,9 @@ test: $(TARGET)
 	@bash tests/test_templates.sh
 	@bash tests/test_validation.sh
 	@bash tests/test_pipeline.sh
+
+test-vista-link-targets: $(TARGET)
+	@bash tests/test_vista_link_codegen.sh
 
 test-hash-unit: build/test_hash_unit
 	@./build/test_hash_unit
