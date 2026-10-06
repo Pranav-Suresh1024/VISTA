@@ -20,12 +20,81 @@ reject_certificate() {
     test "$code" = 1 || { cat "$tmp/check.log"; echo "FAIL: checker expected exit 1, got $code"; exit 1; }
 }
 reject_certificate examples/vista_link/errors/corrupt.vcert
-reject_certificate "$tmp/missing.vcert"
-reject_certificate "$tmp/first/workflow.vcert" --root "$tmp/missing-root"
-reject_certificate "$tmp/first/workflow.vcert" --unknown .
 env PATH="$tmp/no-runtime" "$checker" "$tmp/first/workflow.vcert" --root . | grep -q VERIFIED
 "$binary" "$source" --emit certificate --out-dir "$tmp/second"
 cmp "$tmp/first/workflow.vcert" "$tmp/second/workflow.vcert"
+# Recomputed hashes must not turn malformed assignment/manifest identities into evidence.
+# Both the direct API and CLI exercise fixtures accepted by the existing strict codec.
+cat > "$tmp/identities.cpp" <<'CPP'
+#include "certificate.hpp"
+#include "hash.hpp"
+#include <cassert>
+#include <fstream>
+#include <iostream>
+#include <iterator>
+using namespace vista;
+std::string hex(const std::string& s) { std::string out;for(unsigned char c:s){out+="0123456789abcdef"[c>>4];out+="0123456789abcdef"[c&15];}return out; }
+int main(int argc,char** argv) {
+    assert(argc==3);
+    std::ifstream in(argv[1],std::ios::binary);std::string bytes{std::istreambuf_iterator<char>(in),{}};
+    auto parsed=parse_certificate(bytes);assert(parsed.succeeded());const auto base=parsed.certificate;
+    int failures=0;
+    auto bad=[&](const std::string& label,Certificate c) {
+        for(auto& e:c.cases)e.input_sha256=sha256_hex(e.input);
+        c.coverage_sha256=certificate_coverage_sha256(c);
+        const auto wire=serialize_certificate(c);assert(wire!=bytes);assert(parse_certificate(wire).succeeded());
+        std::ofstream out(std::string(argv[2])+"/"+label+".vcert",std::ios::binary);out<<wire;out.close();assert(out);
+        if(verify_certificate(c,nullptr).verified){std::cerr<<"FAIL direct API accepted "<<label<<" (codec accepted recomputed digests)\n";++failures;}
+    };
+    for(const auto& name: {"Applicant","Applicant.",".category","Applicant.category.extra","Applicant.9bad","Applicant.bad-name","Applicant.Ghost"}) {
+        auto c=base;auto& input=c.cases.front().input;
+        input.erase(input.find("assignment-count "));
+        input+="assignment-count 1\ninput "+hex(name)+" "+hex("general")+"\n";
+        bad("assignment-"+hex(name),c);
+    }
+    for(const auto& id: std::vector<std::string>{"scalar:Ghost.flag:Ghost.flag.class.0","scalar:Applicant.category:Applicant.other.class.0","scalar:Applicant:Applicant.class.0","scalar:Applicant.category:Applicant.category.class.00","scalar:Applicant.category:Applicant.category.class.x","component:00:0:"+std::string(64,'0'),"component:0:x:"+std::string(64,'0'),"component:0:0:bad","unknown:0"}) {
+        auto c=base;c.partition_ids.push_back(id);bad("partition-"+hex(id),c);
+    }
+    auto c=base;c.partition_ids.erase(c.partition_ids.begin());bad("missing-partition",c);
+    std::cout<<"Identity regression direct API failures: "<<failures<<'\n';
+    return failures ? 1 : 0;
+}
+CPP
+mkdir "$tmp/identity-mutants"
+g++ -std=c++17 -Wall -Wextra -Werror -Iinclude "$tmp/identities.cpp" src/certificate.cpp src/hash.cpp src/diagnostic.cpp -o "$tmp/identities"
+identity_code=0
+"$tmp/identities" "$tmp/second/workflow.vcert" "$tmp/identity-mutants" || identity_code=$?
+wire_failures=0
+for certificate in "$tmp/identity-mutants/"*.vcert; do
+    code=0
+    "$checker" "$certificate" > "$tmp/check.log" 2>&1 || code=$?
+    if test "$code" != 1; then echo "FAIL CLI accepted identity mutant $(basename "$certificate") (exit $code)"; wire_failures=$((wire_failures+1)); fi
+done
+echo "Identity regression CLI failures: $wire_failures"
+operational_failures=0
+expect_checker_operational() {
+    local code=0
+    "$checker" "$@" > "$tmp/check.log" 2>&1 || code=$?
+    if test "$code" != 2; then echo "FAIL checker operational expected exit 2, got $code: $*"; operational_failures=$((operational_failures+1)); fi
+}
+expect_checker_operational
+expect_checker_operational "$tmp/missing.vcert"
+expect_checker_operational "$tmp/first"
+expect_checker_operational "$tmp/first/workflow.vcert" --unknown .
+expect_checker_operational "$tmp/first/workflow.vcert" --root
+expect_checker_operational "$tmp/first/workflow.vcert" --root "$tmp/missing-root"
+expect_checker_operational "$tmp/first/workflow.vcert" --root "$tmp/first/workflow.js"
+echo "Checker operational exit failures: $operational_failures"
+if test "$identity_code" != 0 || test "$wire_failures" != 0 || test "$operational_failures" != 0; then exit 1; fi
+mkdir "$tmp/identifier-source"
+cat > "$tmp/identifier-source/module.vista" <<'VISTA'
+module _Form1 { field _flag2: boolean { label "Flag" } export _flag2 }
+VISTA
+cat > "$tmp/identifier-source/main.vista" <<'VISTA'
+workflow _Workflow1 { use "module.vista" as _Alias1 start _Alias1 }
+VISTA
+"$binary" "$tmp/identifier-source/main.vista" --emit certificate --out-dir "$tmp/identifier-cert"
+"$checker" "$tmp/identifier-cert/workflow.vcert" --root . | grep -q VERIFIED
 node - "$tmp/first/workflow.vcert" <<'JS'
 const fs=require('fs'), assert=require('assert'), crypto=require('crypto'),path=require('path');
 const lines=fs.readFileSync(process.argv[2],'utf8').trimEnd().split('\n');

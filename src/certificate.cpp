@@ -179,6 +179,52 @@ CertificateParseResult parse_certificate(std::string_view bytes) {
     return result;
 }
 namespace {
+bool identifier(std::string_view s) {
+    auto letter = [](char c) { return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || c == '_'; };
+    return !s.empty() && letter(s.front()) && std::all_of(s.begin(),s.end(),[&](char c) { return letter(c) || (c >= '0' && c <= '9'); });
+}
+bool qualified(const std::string& name, const std::set<std::string>& aliases) {
+    const auto dot = name.find('.');
+    return dot != std::string::npos && identifier(std::string_view(name).substr(0,dot)) &&
+        identifier(std::string_view(name).substr(dot+1)) && aliases.count(name.substr(0,dot));
+}
+std::size_t identity_count(const std::string& text) {
+    const auto n = count(text);
+    if (text != std::to_string(n)) throw std::runtime_error("noncanonical partition index");
+    return n;
+}
+std::set<std::string> verify_partitions(const Certificate& c, const std::set<std::string>& aliases) {
+    std::map<std::string,std::set<std::size_t>> scalars;
+    std::map<std::size_t,std::set<std::size_t>> components;
+    for (const auto& id : c.partition_ids) {
+        const auto first = id.find(':'), second = id.find(':',first == std::string::npos ? 0 : first+1);
+        if (first == std::string::npos || second == std::string::npos) throw std::runtime_error("invalid partition identity");
+        const auto kind = id.substr(0,first), middle = id.substr(first+1,second-first-1), tail = id.substr(second+1);
+        if (kind == "scalar") {
+            const auto prefix = middle+".class.";
+            if (!qualified(middle,aliases) || tail.rfind(prefix,0) != 0) throw std::runtime_error("invalid scalar field/class identity");
+            scalars[middle].insert(identity_count(tail.substr(prefix.size())));
+        } else if (kind == "component") {
+            const auto at = tail.find(':');
+            if (at == std::string::npos || !hash(tail.substr(at+1)) ||
+                !components[identity_count(middle)].insert(identity_count(tail.substr(0,at))).second)
+                throw std::runtime_error("invalid component assignment identity");
+        } else throw std::runtime_error("unknown partition identity kind");
+    }
+    auto contiguous = [](const std::set<std::size_t>& ids) {
+        std::size_t expected = 0;
+        for (const auto id : ids) if (id != expected++) throw std::runtime_error("incomplete partition indices");
+    };
+    std::set<std::string> fields; std::size_t expected = 0;
+    for (const auto& scalar : scalars) { contiguous(scalar.second); fields.insert(scalar.first); }
+    for (const auto& component : components) {
+        if (component.first != expected++) throw std::runtime_error("incomplete component indices");
+        contiguous(component.second);
+    }
+    if (components.size() > fields.size() || (components.empty() != fields.empty()))
+        throw std::runtime_error("inconsistent scalar/component manifest");
+    return fields;
+}
 std::string unhex(const std::string& s) {
     if (s.size() % 2 || s.find_first_not_of("0123456789abcdef") != std::string::npos)
         throw std::runtime_error("invalid case input hex");
@@ -188,7 +234,7 @@ std::string unhex(const std::string& s) {
     return out;
 }
 // Validate the recorded state/count wire, without evaluating source semantics.
-void verify_input(const CaseEvidence& e, const std::set<std::string>& aliases) {
+void verify_input(const CaseEvidence& e, const std::set<std::string>& aliases, const std::set<std::string>& fields) {
     std::istringstream in(e.input);
     auto line = [&]() { std::string s; if (!std::getline(in,s)) throw std::runtime_error("truncated case input"); return s; };
     auto field = [&](const std::string& key) {
@@ -219,7 +265,7 @@ void verify_input(const CaseEvidence& e, const std::set<std::string>& aliases) {
         const auto s = field("input"); const auto at = s.find(' ');
         if (at == std::string::npos) throw std::runtime_error("invalid assignment");
         const auto name = unhex(s.substr(0,at)); unhex(s.substr(at+1));
-        if (name.empty() || (i && name <= previous) || !aliases.count(name.substr(0,name.find('.'))))
+        if (!qualified(name,aliases) || (i && name <= previous) || !fields.count(name))
             throw std::runtime_error("invalid assignment identity");
         previous = name;
     }
@@ -262,6 +308,7 @@ CertificateVerification verify_certificate(const Certificate& c, const std::file
         std::map<std::string,ArtifactEvidence> artifacts;
         for (const auto& a : c.artifacts) artifacts.emplace(a.role,a);
         for (const auto& alias : aliases) {
+            if (!identifier(alias)) throw std::runtime_error("invalid module alias");
             if (!modules.count(alias+".object")) throw std::runtime_error("missing module object identity");
             const auto source = "module-source."+alias, object = "module-object."+alias;
             if (artifacts.count(source)+artifacts.count(object) != 1) throw std::runtime_error("missing or ambiguous module artifact");
@@ -270,7 +317,8 @@ CertificateVerification verify_certificate(const Certificate& c, const std::file
         if (roles.size() != artifacts.size()) throw std::runtime_error("unexpected artifact role");
         for (const auto& role : roles) if (!artifacts.count(role)) throw std::runtime_error("missing artifact "+role);
         if (artifacts.at("javascript").raw_sha256 != c.javascript_sha256) throw std::runtime_error("JavaScript aggregate mismatch");
-        for (const auto& e : c.cases) verify_input(e,aliases);
+        const auto fields = verify_partitions(c,aliases);
+        for (const auto& e : c.cases) verify_input(e,aliases,fields);
         if (root) {
             if (!std::filesystem::is_directory(*root)) throw std::runtime_error("root is not a project directory");
             std::map<std::string,std::string> bytes;
