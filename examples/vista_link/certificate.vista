@@ -6,6 +6,6 @@ module Certificate {
     required
   }
 
-  enter when applicant_category == reserved and present(certificate)
+  enter when applicant_category == reserved
   export certificate
 }

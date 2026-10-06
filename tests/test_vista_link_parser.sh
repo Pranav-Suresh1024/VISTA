@@ -53,7 +53,8 @@ expect_ast examples/vista_link/applicant.vista \
 expect_ast examples/vista_link/certificate.vista \
     "Import Applicant.category as applicant_category" \
     "EnterWhen" \
-    "Unary present"
+    "Binary ==" \
+    "Name applicant_category"
 
 expect_ast examples/vista_link/scholarship.workflow.vista \
     "Workflow ScholarshipApplication" \
@@ -67,6 +68,13 @@ expect_failure examples/vista_link/errors/malformed_route.vista "SYN001"
 
 temp_dir="$(mktemp -d)"
 trap 'rm -rf -- "$temp_dir"' EXIT
+cat >"$temp_dir/file-presence.vista" <<'EOF'
+module FilePresence {
+  field upload: file { label "Upload" }
+  enter when present(upload)
+}
+EOF
+expect_ast "$temp_dir/file-presence.vista" "Unary present" "Name upload"
 cat >"$temp_dir/duplicate-enter.vista" <<'EOF'
 module DuplicateEnter {
   enter when true

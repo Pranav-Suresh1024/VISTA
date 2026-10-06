@@ -346,6 +346,24 @@ int main(int argc, char* argv[]) {
                   << '\n';
         return 0;
     }
+    if (validation_mode && parse_result.workflow != nullptr) {
+        const auto linked = vista::link_workflow(*parse_result.workflow, source_path);
+        print_diagnostics(source_path, linked.diagnostics);
+        if (!linked.succeeded()) return 1;
+        const auto input = vista::load_input_values(argv[3]);
+        auto evaluation = vista::evaluate_workflow(linked.workflow, input.values);
+        for (const auto& diagnostic : input.diagnostics) {
+            evaluation.diagnostics.push_back(diagnostic);
+            evaluation.observation.diagnostic_codes.push_back(diagnostic.code);
+            evaluation.observation.diagnostic_details.push_back({diagnostic.code, "", ""});
+        }
+        if (!input.succeeded()) evaluation.observation.complete = false;
+        std::cout << vista::format_observation(evaluation.observation);
+        for (const auto& diagnostic : evaluation.diagnostics)
+            std::cout << "  " << diagnostic.code << ": " << diagnostic.message << '\n';
+        if (!input.data_opened) return 2;
+        return evaluation.succeeded() ? 0 : 1;
+    }
     if (parse_result.form == nullptr) {
         std::cerr << "VISTA: only --emit ast is supported for modules and workflows\n";
         return 2;

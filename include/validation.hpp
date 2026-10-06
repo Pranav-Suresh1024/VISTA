@@ -7,6 +7,7 @@
 #include "ast.hpp"
 #include "diagnostic.hpp"
 #include "semantic.hpp"
+#include "evaluator.hpp"
 
 namespace vista {
 

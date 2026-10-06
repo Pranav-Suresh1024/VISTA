@@ -9,10 +9,10 @@ TARGET := build/vista
 GENERATED_SCANNER := build/vista_lexer.cpp
 GENERATED_PARSER := build/vista_parser.cpp
 GENERATED_PARSER_HEADER := build/vista_parser.hpp
-SOURCES := src/main.cpp src/analysis.cpp src/ast.cpp src/codegen.cpp src/diagnostic.cpp src/hash.cpp src/linker.cpp src/module.cpp src/parser.cpp src/semantic.cpp src/token.cpp src/validation.cpp
-HEADERS := include/analysis.hpp include/ast.hpp include/codegen.hpp include/diagnostic.hpp include/hash.hpp include/linker.hpp include/module.hpp include/parser.hpp include/scanner.hpp include/semantic.hpp include/token.hpp include/validation.hpp include/version.hpp include/workflow.hpp
+SOURCES := src/main.cpp src/analysis.cpp src/ast.cpp src/codegen.cpp src/diagnostic.cpp src/evaluator.cpp src/hash.cpp src/linker.cpp src/module.cpp src/parser.cpp src/semantic.cpp src/token.cpp src/validation.cpp
+HEADERS := include/analysis.hpp include/ast.hpp include/codegen.hpp include/diagnostic.hpp include/evaluator.hpp include/hash.hpp include/linker.hpp include/module.hpp include/parser.hpp include/scanner.hpp include/semantic.hpp include/token.hpp include/validation.hpp include/version.hpp include/workflow.hpp
 
-.PHONY: all test test-hash-unit demo clean
+.PHONY: all test test-hash-unit test-evaluator-scalar demo clean
 
 all: $(TARGET)
 
@@ -30,11 +30,13 @@ $(TARGET): $(SOURCES) $(HEADERS) $(GENERATED_SCANNER) $(GENERATED_PARSER) $(GENE
 	$(CXX) $(FLEX_CXXFLAGS) -Wno-unused-parameter $(SOURCES) $(GENERATED_SCANNER) $(GENERATED_PARSER) -o $(TARGET)
 
 test: $(TARGET)
+	@$(MAKE) --no-print-directory test-evaluator-scalar
 	@bash tests/test_scanner.sh
 	@bash tests/test_parser.sh
 	@bash tests/test_vista_link_parser.sh
 	@bash tests/test_vista_link_module.sh
 	@bash tests/test_vista_link_linker.sh
+	@bash tests/test_vista_link_evaluator.sh
 	@bash tests/test_semantic.sh
 	@bash tests/test_analysis.sh
 	@bash tests/test_codegen.sh
@@ -45,6 +47,13 @@ test: $(TARGET)
 
 test-hash-unit: build/test_hash_unit
 	@./build/test_hash_unit
+
+test-evaluator-scalar: build/test_evaluator_scalar
+	@./build/test_evaluator_scalar
+
+build/test_evaluator_scalar: tests/test_evaluator_scalar.cpp src/evaluator.cpp $(HEADERS)
+	@mkdir -p build
+	$(CXX) $(CXXFLAGS) tests/test_evaluator_scalar.cpp src/evaluator.cpp -o $@
 
 build/test_hash_unit: tests/test_hash_unit.cpp src/hash.cpp src/module.cpp src/semantic.cpp src/ast.cpp src/token.cpp include/hash.hpp include/module.hpp include/semantic.hpp include/ast.hpp include/diagnostic.hpp include/token.hpp
 	@mkdir -p build

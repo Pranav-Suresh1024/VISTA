@@ -151,10 +151,9 @@ int main(int argc, char** argv) {
     linked = {};
     assert(copy.modules.size() == 2);
     const auto& entry = copy.modules[1].entry;
-    assert(entry.value == "and" && entry.operands.size() == 2);
-    assert(entry.operands[0].operands[0].value == "Applicant.category");
-    assert(entry.operands[0].operands[1].choice_literal);
-    assert(entry.operands[1].operands[0].value == "Certificate.certificate");
+    assert(entry.value == "==" && entry.operands.size() == 2);
+    assert(entry.operands[0].value == "Applicant.category");
+    assert(entry.operands[1].choice_literal && entry.operands[1].value == "reserved");
     assert(vista::format_linked_workflow(copy).find("Applicant.category") != std::string::npos);
 }
 EOF
