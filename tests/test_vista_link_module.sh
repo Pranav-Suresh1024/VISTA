@@ -82,13 +82,17 @@ module Newlines {
 }
 EOF
 sed 's/$/\r/' "$root/newlines/lf.vista" >"$root/newlines/crlf.vista"
+tr '\n' '\r' <"$root/newlines/lf.vista" >"$root/newlines/cr.vista"
 $binary "$root/newlines/lf.vista" --emit module --out-dir "$root/newlines/lf" >/dev/null 2>&1
 lf_status=$?
 $binary "$root/newlines/crlf.vista" --emit module --out-dir "$root/newlines/crlf" >/dev/null 2>&1
 crlf_status=$?
-if [[ $lf_status -ne 0 || $crlf_status -ne 0 ]] ||
-   ! cmp "$root/newlines/lf/module.vobj" "$root/newlines/crlf/module.vobj"; then
-    echo "FAIL: LF and CRLF sources did not produce the same object"
+$binary "$root/newlines/cr.vista" --emit module --out-dir "$root/newlines/cr" >/dev/null 2>&1
+cr_status=$?
+if [[ $lf_status -ne 0 || $crlf_status -ne 0 || $cr_status -ne 0 ]] ||
+   ! cmp "$root/newlines/lf/module.vobj" "$root/newlines/crlf/module.vobj" ||
+   ! cmp "$root/newlines/lf/module.vobj" "$root/newlines/cr/module.vobj"; then
+    echo "FAIL: LF, CRLF and CR sources did not produce the same object"
     failures=$((failures + 1))
 fi
 
@@ -101,6 +105,36 @@ module UnknownName {
 }
 EOF
 expect_module_failure "$root/unknown-name.vista" SEM002 "$root/unknown-name"
+
+cat >"$root/mixed-import.vista" <<'EOF'
+module MixedImport {
+  import Applicant category as imported_alias
+  field accepted: boolean { label "Accepted" }
+  enter when imported_alias and undeclared
+  export accepted
+}
+EOF
+expect_module_failure "$root/mixed-import.vista" SEM002 "$root/mixed-import"
+
+cat >"$root/mixed-import-local-type.vista" <<'EOF'
+module MixedImportLocalType {
+  import Applicant category as imported_alias
+  field accepted: boolean { label "Accepted" }
+  enter when imported_alias and (accepted == 42)
+  export accepted
+}
+EOF
+expect_module_failure "$root/mixed-import-local-type.vista" SEM003 "$root/mixed-import-local-type"
+
+cat >"$root/mixed-import-boolean.vista" <<'EOF'
+module MixedImportBoolean {
+  import Applicant category as imported_alias
+  field accepted: boolean { label "Accepted" }
+  enter when imported_alias and 42
+  export accepted
+}
+EOF
+expect_module_failure "$root/mixed-import-boolean.vista" SEM003 "$root/mixed-import-boolean"
 
 if ! make --no-print-directory test-hash-unit; then
     failures=$((failures + 1))

@@ -16,11 +16,14 @@ std::string normalize_newlines(std::string_view source) {
     std::string normalized;
     normalized.reserve(source.size());
     for (std::size_t index = 0; index < source.size(); ++index) {
-        if (source[index] == '\r' && index + 1U < source.size() &&
-            source[index + 1U] == '\n') {
-            continue;
+        if (source[index] == '\r') {
+            normalized.push_back('\n');
+            if (index + 1U < source.size() && source[index + 1U] == '\n') {
+                ++index;
+            }
+        } else {
+            normalized.push_back(source[index]);
         }
-        normalized.push_back(source[index]);
     }
     return normalized;
 }
@@ -257,6 +260,9 @@ ModuleLoadResult load_module_object(std::string_view bytes) {
         return invalid_object();
     }
     result.object.canonical_source.assign(bytes.substr(offset, source_size));
+    if (result.object.canonical_source.find('\r') != std::string::npos) {
+        return invalid_object();
+    }
     offset += source_size;
     if (offset >= bytes.size() || bytes[offset] != '\n') {
         return invalid_object();

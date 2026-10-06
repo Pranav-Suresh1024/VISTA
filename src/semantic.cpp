@@ -384,9 +384,6 @@ private:
     }
 
     void validate_condition(const Expression* expression, std::string_view description) {
-        if (contains_import(expression)) {
-            return;
-        }
         const ExpressionInfo info = analyze_expression(expression);
         if (info.type != ValueType::Boolean && info.type != ValueType::Error) {
             add_diagnostic(
@@ -403,13 +400,9 @@ private:
         return info;
     }
 
-    bool contains_import(const Expression* expression) const {
-        if (expression == nullptr) {
-            return false;
-        }
-        return (expression->kind == ExpressionKind::Name &&
-                imported_aliases.find(expression->value) != imported_aliases.end()) ||
-               contains_import(expression->left) || contains_import(expression->right);
+    bool is_import(const Expression* expression) const {
+        return expression->kind == ExpressionKind::Name &&
+               imported_aliases.find(expression->value) != imported_aliases.end();
     }
 
     ExpressionInfo analyze_name(const Expression* expression,
@@ -419,6 +412,10 @@ private:
             return remember(
                 expression,
                 {value_type_for(symbol->type), symbol->name, false});
+        }
+
+        if (is_import(expression)) {
+            return remember(expression, {ValueType::Error, expression->value, false});
         }
 
         if (choice_context != nullptr && contains_option(*choice_context, expression->value)) {
@@ -453,7 +450,22 @@ private:
         ExpressionInfo left_info;
         ExpressionInfo right_info;
 
-        if (left_symbol != nullptr && left_symbol->type == FieldType::Choice &&
+        if (is_import(left) || is_import(right)) {
+            const bool equality = expression->value == "==" || expression->value == "!=";
+            // A bare name paired with an import may be a choice option;
+            // the linker validates it once the imported domain is known.
+            const auto operand_info = [&](const Expression* operand,
+                                          const Expression* other) {
+                if (equality && is_import(other) &&
+                    operand->kind == ExpressionKind::Name &&
+                    result.symbols.find(operand->value) == nullptr && !is_import(operand)) {
+                    return remember(operand, {ValueType::Error, "", false});
+                }
+                return analyze_expression(operand);
+            };
+            left_info = operand_info(left, right);
+            right_info = operand_info(right, left);
+        } else if (left_symbol != nullptr && left_symbol->type == FieldType::Choice &&
             (right->kind == ExpressionKind::Name ||
              right->kind == ExpressionKind::StringLiteral) &&
             contains_option(*left_symbol, right->value)) {
@@ -597,10 +609,8 @@ private:
         if (expression->value == "and" || expression->value == "or") {
             const ExpressionInfo left = analyze_expression(expression->left);
             const ExpressionInfo right = analyze_expression(expression->right);
-            if (left.type == ValueType::Error || right.type == ValueType::Error) {
-                return remember(expression, {ValueType::Error, "", false});
-            }
-            if (left.type != ValueType::Boolean || right.type != ValueType::Boolean) {
+            if ((left.type != ValueType::Boolean && left.type != ValueType::Error) ||
+                (right.type != ValueType::Boolean && right.type != ValueType::Error)) {
                 add_diagnostic(
                     result,
                     "SEM003",
@@ -608,6 +618,9 @@ private:
                         "' requires boolean operands, but found " +
                         value_type_name(left.type) + " and " + value_type_name(right.type),
                     expression->span);
+                return remember(expression, {ValueType::Error, "", false});
+            }
+            if (left.type == ValueType::Error || right.type == ValueType::Error) {
                 return remember(expression, {ValueType::Error, "", false});
             }
             return remember(expression, {ValueType::Boolean, "", false});

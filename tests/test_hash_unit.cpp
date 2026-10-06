@@ -35,6 +35,16 @@ int main() {
                round_trip.object.canonical_source == object.canonical_source,
            "valid object must preserve identity and source");
 
+    for (const std::string source : {"module RoundTrip {}\r", "module RoundTrip {}\r\n"}) {
+        object.canonical_source = source;
+        object.source_sha256 = vista::sha256_hex(source);
+        const auto noncanonical =
+            vista::load_module_object(vista::serialize_module_object(object));
+        expect(!noncanonical.succeeded() && noncanonical.diagnostics.size() == 1 &&
+                   noncanonical.diagnostics[0].code == "MOD004",
+               "correctly hashed CR payload must be rejected as noncanonical");
+    }
+
     std::string changed = serialized;
     const std::size_t payload =
         changed.find("module RoundTrip {}", changed.find("source-bytes"));
