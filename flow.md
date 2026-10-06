@@ -239,7 +239,7 @@ main, --emit certificate --out-dir DIR [--javascript FILE]
       retain original state/prefix (whole: identical complete trace)
       probe candidates, retain only reproducing disagreements
     record witness + both canonical observations; coverage digest
-  add absolute raw source/module paths and relative raw IR/HTML identities
+  add absolute source/module paths preserving link/.. spelling, plus relative raw IR/HTML identities
   serialize_certificate                            [src/certificate.cpp]
   write workflow.vcert: PASS exit 0; mismatch/incomplete exit 1
   operational CERT006: exit 2, no final certificate

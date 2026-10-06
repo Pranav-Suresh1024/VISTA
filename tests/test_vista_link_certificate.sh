@@ -46,6 +46,39 @@ mkdir -p "$odd"
 cp examples/vista_link/{scholarship.workflow,applicant,certificate}.vista "$odd/"
 "$binary" "$odd/scholarship.workflow.vista" --emit certificate --out-dir "$odd/output's"
 grep -q '^status PASS$' "$odd/output's/workflow.vcert"
+# Lexical link/.. removal changes the file: the filesystem follows link first.
+# Reopen both recorded workflow and module paths, preserving their raw bytes.
+links="$odd/artifact-links"
+mkdir -p "$links/actual/child" "$links/spelled"
+ln -s "$links/actual/child" "$links/spelled/link"
+cp examples/vista_link/{scholarship.workflow,applicant,certificate}.vista "$links/actual/"
+printf 'different workflow bytes\n' > "$links/spelled/scholarship.workflow.vista"
+"$binary" "$links/spelled/link/../scholarship.workflow.vista" --emit certificate --out-dir "$tmp/workflow-link"
+sed 's|applicant.vista|spelled/link/../applicant.vista|' "$source" > "$links/module-path.workflow.vista"
+cp examples/vista_link/certificate.vista "$links/"
+"$binary" "$links/module-path.workflow.vista" --emit certificate --out-dir "$tmp/module-link"
+node - "$tmp/workflow-link/workflow.vcert" "$tmp/module-link/workflow.vcert" <<'JS'
+const fs=require('fs'),assert=require('assert'),crypto=require('crypto');
+const rawToken=token=>Buffer.from(token.replace(/%([0-9A-F]{2})/g,(_,h)=>String.fromCharCode(parseInt(h,16))),'latin1');
+const failures=[];
+for(const certificate of process.argv.slice(2)) {
+  const lines=fs.readFileSync(certificate,'utf8').split('\n');
+  assert(lines.includes('status PASS'));
+  const checked=new Set();
+  for(const line of lines.filter(l=>l.startsWith('artifact '))) {
+    const [,encodedRole,encodedPath,expected]=line.split(' '),role=rawToken(encodedRole).toString('ascii');
+    if(role!=='workflow-source'&&!role.startsWith('module-source.'))continue;
+    checked.add(role);
+    try {
+      const actual=crypto.createHash('sha256').update(fs.readFileSync(rawToken(encodedPath))).digest('hex');
+      if(actual!==expected) failures.push(role+': recorded path hashes different bytes');
+    } catch(error) { failures.push(role+': recorded path cannot be read ('+error.code+')'); }
+  }
+  for(const role of ['workflow-source','module-source.Applicant','module-source.Certificate'])assert(checked.has(role));
+}
+assert.deepEqual(failures,[],'recorded source paths must reopen the hashed input bytes');
+console.log('Symlink/.. workflow-source and module-source raw artifact hashes passed.');
+JS
 # Raw CRLF hash differs from the canonical source hash but is independently named.
 mkdir "$tmp/crlf-source"
 cp examples/vista_link/{scholarship.workflow,certificate}.vista "$tmp/crlf-source/"

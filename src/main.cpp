@@ -358,13 +358,14 @@ int main(int argc, char* argv[]) {
         }
         std::vector<vista::ArtifactEvidence> source_artifacts;
         if (certificate_mode) {
-            source_artifacts.push_back({"workflow-source",std::filesystem::absolute(source_path).lexically_normal().string(),vista::sha256_hex(workflow_source_bytes)});
+            // Preserve link/.. spelling: lexical normalization can name a different file.
+            source_artifacts.push_back({"workflow-source",std::filesystem::absolute(source_path).string(),vista::sha256_hex(workflow_source_bytes)});
             for (const auto* use : parse_result.workflow->uses) {
                 const auto path = std::filesystem::path(source_path).parent_path()/use->source_path;
                 std::string bytes;
                 if (!read_bytes(path,bytes)) return 2;
                 source_artifacts.push_back({(path.extension() == ".vobj" ? "module-object." : "module-source.")+use->alias,
-                    std::filesystem::absolute(path).lexically_normal().string(),vista::sha256_hex(bytes)});
+                    std::filesystem::absolute(path).string(),vista::sha256_hex(bytes)});
             }
         }
         const auto linked = vista::link_workflow(*parse_result.workflow, source_path);
