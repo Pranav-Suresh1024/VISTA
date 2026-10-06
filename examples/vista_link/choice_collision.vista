@@ -1,0 +1,7 @@
+module ChoiceCollision {
+  field category: choice { general, reserved } { label "Category" }
+  field reserved: boolean { label "Reserved flag" }
+  field evidence: file { label "Evidence" show when category == reserved required when reserved == category }
+  enter when category == reserved
+  export category
+}

@@ -12,6 +12,7 @@
 #include "codegen.hpp"
 #include "diagnostic.hpp"
 #include "module.hpp"
+#include "linker.hpp"
 #include "parser.hpp"
 #include "scanner.hpp"
 #include "semantic.hpp"
@@ -24,7 +25,7 @@ namespace {
 void print_help(std::ostream& output) {
     output << "VISTA - Validation and Interface Specification Translation Analyzer\n\n"
            << "Usage: vista <source.vista> --emit <tokens|ast|symbols|dependencies|graph|diagnostics>\n"
-           << "       vista <source.vista> --emit <html|all|module> --out-dir <directory>\n"
+           << "       vista <source.vista> --emit <html|all|module|linked> --out-dir <directory>\n"
            << "       vista <source.vista> --validate-data <values.data>\n"
            << "       vista --list-templates\n"
            << "       vista [option]\n\n"
@@ -41,6 +42,7 @@ void print_help(std::ostream& output) {
            << "  --emit html --out-dir DIR  Generate a standalone HTML form\n"
            << "  --emit all --out-dir DIR   Write every demonstration artifact\n"
            << "  --emit module --out-dir DIR  Compile a deterministic module object\n"
+           << "  --emit linked --out-dir DIR  Link a typed workflow to workflow.ir\n"
            << "  --validate-data FILE  Validate supplied field values in the CLI\n";
 }
 
@@ -225,8 +227,9 @@ int main(int argc, char* argv[]) {
 
     const std::string emit_mode = validation_mode ? "" : argv[3];
     const bool module_mode = emit_mode == "module";
+    const bool linked_mode = emit_mode == "linked";
     const bool directory_mode = emit_mode == "html" || emit_mode == "all" ||
-                                module_mode;
+                                module_mode || linked_mode;
     const bool known_mode =
         emit_mode == "tokens" || emit_mode == "ast" || emit_mode == "symbols" ||
         emit_mode == "dependencies" || emit_mode == "graph" ||
@@ -248,7 +251,8 @@ int main(int argc, char* argv[]) {
     const std::filesystem::path output_directory = directory_mode ? argv[5] : "";
     if (directory_mode) {
         if (!prepare_output_directory(output_directory) ||
-            !clear_generated_artifacts(output_directory, all_mode, module_mode)) {
+            !(linked_mode ? remove_artifact(output_directory, "workflow.ir") :
+              clear_generated_artifacts(output_directory, all_mode, module_mode))) {
             return 2;
         }
     }
@@ -297,6 +301,18 @@ int main(int argc, char* argv[]) {
     }
     if (emit_mode == "ast") {
         std::cout << ast_text;
+        return 0;
+    }
+    if (linked_mode) {
+        if (parse_result.workflow == nullptr) {
+            std::cerr << "VISTA: --emit linked requires a workflow source\n";
+            return 2;
+        }
+        const auto linked = vista::link_workflow(*parse_result.workflow, source_path);
+        print_diagnostics(source_path, linked.diagnostics);
+        if (!linked.succeeded()) return 1;
+        if (!write_artifact(output_directory, "workflow.ir", vista::format_linked_workflow(linked.workflow))) return 2;
+        std::cout << "Generated " << (output_directory / "workflow.ir").string() << '\n';
         return 0;
     }
     if (module_mode) {

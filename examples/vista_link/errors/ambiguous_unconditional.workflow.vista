@@ -1,0 +1,8 @@
+workflow Ambiguous {
+  use "../applicant.vista" as Applicant
+  use "../certificate.vista" as Certificate
+  use "../choice_collision.vista" as Other
+  start Applicant
+  route Applicant -> Certificate
+  route Applicant -> Other
+}

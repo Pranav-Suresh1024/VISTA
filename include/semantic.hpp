@@ -28,6 +28,7 @@ struct Symbol {
     std::vector<std::string> options;
     std::string label;
     SourceSpan span;
+    bool read_only = false;
 };
 
 class SymbolTable {
@@ -59,6 +60,8 @@ struct SemanticResult {
 
 SemanticResult analyze_semantics(const FormAst& form);
 SemanticResult analyze_semantics(const ModuleAst& module);
+SemanticResult analyze_semantics(const ModuleAst& module,
+                                 const std::vector<Symbol>& imported_symbols);
 std::string format_symbol_table(const SymbolTable& symbols);
 
 }  // namespace vista

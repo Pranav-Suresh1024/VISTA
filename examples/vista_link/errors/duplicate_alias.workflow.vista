@@ -1,0 +1,5 @@
+workflow DuplicateAlias {
+  use "../applicant.vista" as Applicant
+  use "../certificate.vista" as Applicant
+  start Applicant
+}

@@ -1,0 +1,4 @@
+workflow MissingExport {
+  use "../certificate.vista" as Certificate
+  start Certificate
+}

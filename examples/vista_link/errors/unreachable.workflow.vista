@@ -1,0 +1,5 @@
+workflow Unreachable {
+  use "../applicant.vista" as Applicant
+  use "../certificate.vista" as Certificate
+  start Applicant
+}

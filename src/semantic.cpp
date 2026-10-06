@@ -167,6 +167,19 @@ public:
         }
     }
 
+    SemanticAnalyzer(const ModuleAst& module, const std::vector<Symbol>& imports)
+        : declarations(module.declarations), root_span(module.span),
+          enter_condition(module.enter_condition) {
+        for (Symbol symbol : imports) {
+            symbol.read_only = true;
+            const std::string name = symbol.name;
+            const SourceSpan span = symbol.span;
+            if (!result.symbols.insert(std::move(symbol))) {
+                add_diagnostic(result, "SEM001", "duplicate imported alias '" + name + "'", span);
+            }
+        }
+    }
+
     SemanticResult run() {
         collect_symbols();
         if (require_field && result.symbols.entries().empty()) {
@@ -659,6 +672,11 @@ SemanticResult analyze_semantics(const FormAst& form) {
 
 SemanticResult analyze_semantics(const ModuleAst& module) {
     return SemanticAnalyzer(module).run();
+}
+
+SemanticResult analyze_semantics(const ModuleAst& module,
+                                 const std::vector<Symbol>& imported_symbols) {
+    return SemanticAnalyzer(module, imported_symbols).run();
 }
 
 std::string format_symbol_table(const SymbolTable& symbols) {
