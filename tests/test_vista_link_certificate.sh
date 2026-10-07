@@ -380,10 +380,34 @@ const wire=decodeURIComponent(fs.readFileSync(process.argv[2],'utf8').split('\n'
 assert(wire.startsWith('mode whole\nactive \nprefix-count 0\n'));
 assert(wire.includes('input '+Buffer.from('A.flag').toString('hex')+' '+Buffer.from('true').toString('hex')+'\n'));
 JS
-"$binary" examples/vista_link/all_type_routes.workflow.vista --emit certificate --out-dir "$tmp/all-types"
-"$checker" "$tmp/all-types/workflow.vcert" --root .
-grep -q '^status PASS$' "$tmp/all-types/workflow.vcert"
-"$tmp/codec" "$tmp/all-types/workflow.vcert" "$tmp/mismatch/workflow.vcert" "$tmp/cycle/workflow.vcert"
+for run in first second; do
+    code=0
+    "$binary" examples/vista_link/all_type_routes.workflow.vista --emit certificate --out-dir "$tmp/all-types-$run" || code=$?
+    test "$code" = 1
+    grep -q '^status UNSUPPORTED$' "$tmp/all-types-$run/workflow.vcert"
+    grep -q CERT003 "$tmp/all-types-$run/workflow.vcert"
+    reject_certificate "$tmp/all-types-$run/workflow.vcert" --root .
+done
+cmp "$tmp/all-types-first/workflow.vcert" "$tmp/all-types-second/workflow.vcert"
+for group in numeric textual selection; do
+    case "$group" in
+        numeric) types='integer|decimal|date|boolean';;
+        textual) types='text|textarea|email|phone|boolean';;
+        selection) types='choice|file|boolean';;
+    esac
+    directory="$tmp/$group-source"
+    mkdir "$directory"
+    cp examples/vista_link/{all_type_routes.workflow,applicant}.vista "$directory/"
+    awk -v types="$types" '$1 != "field" || $3 ~ ("^(" types ")$")' examples/vista_link/all_type_routes.vista > "$directory/all_type_routes.vista"
+    "$binary" "$directory/all_type_routes.workflow.vista" --emit certificate --out-dir "$tmp/all-types-$group"
+    "$checker" "$tmp/all-types-$group/workflow.vcert" --root .
+    grep -q '^status PASS$' "$tmp/all-types-$group/workflow.vcert"
+    "$tmp/codec" "$tmp/all-types-$group/workflow.vcert" "$tmp/mismatch/workflow.vcert" "$tmp/cycle/workflow.vcert"
+    printf '%s: ' "$group"; grep '^expected-case-count ' "$tmp/all-types-$group/workflow.vcert"
+done
+grep -h '^  field ' "$tmp/"*-source/all_type_routes.vista | sort -u > "$tmp/group-fields"
+grep '^  field ' examples/vista_link/all_type_routes.vista | sort > "$tmp/original-fields"
+cmp "$tmp/original-fields" "$tmp/group-fields"
 mkdir "$tmp/object-source"
 "$binary" "$tmp/crlf-source/applicant.vista" --emit module --out-dir "$tmp/object-source"
 cp examples/vista_link/certificate.vista "$tmp/object-source/"

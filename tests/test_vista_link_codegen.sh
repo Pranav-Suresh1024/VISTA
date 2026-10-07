@@ -8,6 +8,19 @@ if ! ./build/vista examples/vista_link/scholarship.workflow.vista --emit workflo
     echo 'FAIL: workflow emission unavailable'; exit 1
 fi
 for file in workflow.ir workflow.js workflow.html; do test -s "$tmp/demo/$file"; done
+for group in numeric textual selection; do
+    case "$group" in
+        numeric) types='integer|decimal|date|boolean';;
+        textual) types='text|textarea|email|phone|boolean';;
+        selection) types='choice|file|boolean';;
+    esac
+    mkdir "$tmp/$group-source"
+    cp examples/vista_link/{all_type_routes.workflow,applicant}.vista "$tmp/$group-source/"
+    awk -v types="$types" '$1 != "field" || $3 ~ ("^(" types ")$")' examples/vista_link/all_type_routes.vista > "$tmp/$group-source/all_type_routes.vista"
+done
+grep -h '^  field ' "$tmp/"*-source/all_type_routes.vista | sort -u > "$tmp/group-fields"
+grep '^  field ' examples/vista_link/all_type_routes.vista | sort > "$tmp/original-fields"
+cmp "$tmp/original-fields" "$tmp/group-fields"
 cat > "$tmp/probe.cpp" <<'CPP'
 #include "codegen.hpp"
 #include "evaluator.hpp"
@@ -50,10 +63,27 @@ int main(int argc,char** argv) {
     std::cerr<<"Compared demo partition cases: "<<suite.cases.size()<<'\n';
     parsed=parse_tokens(scan_file("examples/vista_link/all_type_routes.workflow.vista").tokens); assert(parsed.succeeded());
     linked=link_workflow(*parsed.workflow,"examples/vista_link/all_type_routes.workflow.vista"); assert(linked.succeeded());
-    p=derive_partitions(linked.workflow); suite=enumerate_route_cases(linked.workflow,p); assert(suite.complete());
-    artifacts(linked.workflow,root+"/alltypes");
-    for(const auto& c:suite.cases) probe(linked.workflow,root+"/alltypes",c.values,c.active_module);
-    std::cerr<<"Compared all-type partition cases: "<<suite.cases.size()<<'\n';
+    p=derive_partitions(linked.workflow); suite=enumerate_route_cases(linked.workflow,p); assert(!suite.complete());
+    bool limited=false; for(const auto& d:suite.diagnostics)limited=limited||d.code=="CERT003";assert(limited);
+    // Still execute a concrete full-source case; exhaustive groups follow below.
+    artifacts(linked.workflow,root+"/combined");
+    probe(linked.workflow,root+"/combined",{{"AllTypes.boolean_value","true"},{"Finish.category","general"},
+        {"AllTypes.integer_value","18"},{"AllTypes.decimal_value","1.5"},{"AllTypes.date_value","2024-03-01"},
+        {"AllTypes.choice_value","first"},{"AllTypes.text_value","name"},{"AllTypes.textarea_value","note"},
+        {"AllTypes.email_value","a@b.c"},{"AllTypes.phone_value","1234567"},{"AllTypes.file_value","file.pdf"}});
+    std::size_t group_cases=0;
+    for(const std::string group:{"numeric","textual","selection"}) {
+        const auto source=root+"/"+group+"-source/all_type_routes.workflow.vista";
+        parsed=parse_tokens(scan_file(source).tokens);assert(parsed.succeeded());
+        linked=link_workflow(*parsed.workflow,source);assert(linked.succeeded());
+        p=derive_partitions(linked.workflow);suite=enumerate_route_cases(linked.workflow,p);assert(suite.complete());
+        artifacts(linked.workflow,root+"/"+group);
+        bool finish=false,whole=false;
+        for(const auto& c:suite.cases){probe(linked.workflow,root+"/"+group,c.values,c.active_module);finish=finish||c.active_module=="Finish";whole=whole||c.active_module.empty();}
+        assert(finish&&whole);group_cases+=suite.cases.size();
+        std::cerr<<"Compared "<<group<<" all-type partition cases: "<<suite.cases.size()<<'\n';
+    }
+    std::cerr<<"Compared all-type grouped partition cases: "<<group_cases<<'\n';
     LinkedWorkflow w; w.name="Safe </script>"; w.start_alias="A";
     LinkedModule a; a.alias="A"; a.name="A"; a.entry_rule_id="A.entry";
     const std::vector<FieldType> types={FieldType::Text,FieldType::Integer,FieldType::Decimal,FieldType::Boolean,FieldType::Date,FieldType::Choice,FieldType::File,FieldType::Email,FieldType::Phone,FieldType::Textarea};

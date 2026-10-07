@@ -1,0 +1,14 @@
+module Eligibility {
+  import Applicant category as applicant_category
+
+  field age: integer {
+    label "Applicant age"
+    required
+    minimum 18
+    maximum 120
+  }
+
+  check applicant_category == general or applicant_category == reserved
+    message "Choose a supported applicant category"
+  export age
+}

@@ -12,7 +12,7 @@ GENERATED_PARSER_HEADER := build/vista_parser.hpp
 SOURCES := src/main.cpp src/analysis.cpp src/ast.cpp src/certificate.cpp src/certify.cpp src/codegen.cpp src/diagnostic.cpp src/evaluator.cpp src/hash.cpp src/linker.cpp src/module.cpp src/parser.cpp src/partition.cpp src/semantic.cpp src/token.cpp src/validation.cpp
 HEADERS := include/analysis.hpp include/ast.hpp include/certificate.hpp include/certify.hpp include/codegen.hpp include/diagnostic.hpp include/evaluator.hpp include/hash.hpp include/linker.hpp include/module.hpp include/parser.hpp include/partition.hpp include/scanner.hpp include/semantic.hpp include/token.hpp include/validation.hpp include/version.hpp include/workflow.hpp
 
-.PHONY: all test test-vista-link-targets test-hash-unit test-evaluator-scalar demo clean
+.PHONY: all test test-vista-link-targets test-hash-unit test-evaluator-scalar demo vista-link-demo clean
 
 all: $(TARGET) build/vista-cert-check
 
@@ -53,6 +53,8 @@ test: $(TARGET)
 test-vista-link-targets: $(TARGET) build/vista-cert-check
 	@bash tests/test_vista_link_codegen.sh
 	@bash tests/test_vista_link_certificate.sh
+	@bash tests/test_vista_link_mutations.sh
+	@bash tests/test_pipeline.sh --vista-link
 
 test-hash-unit: build/test_hash_unit
 	@./build/test_hash_unit
@@ -84,6 +86,17 @@ demo: $(TARGET)
 	@./$(TARGET) templates/scholarship_application.vista --validate-data samples/scholarship-invalid.data || true
 	@echo
 	@./$(TARGET) examples/hidden_required.vista --emit diagnostics || true
+
+vista-link-demo: $(TARGET) build/vista-cert-check
+	@./$(TARGET) examples/vista_link/scholarship-demo.workflow.vista --emit certificate --out-dir out/vista-link-demo/valid
+	@./build/vista-cert-check out/vista-link-demo/valid/workflow.vcert --root .
+	@printf 'Applicant.category = general\nEligibility.age = 18\n' > out/vista-link-demo/general.data
+	@printf 'Applicant.category = reserved\nEligibility.age = 18\nCertificate.certificate = certificate.pdf\n' > out/vista-link-demo/reserved.data
+	@./$(TARGET) examples/vista_link/scholarship-demo.workflow.vista --validate-data out/vista-link-demo/general.data
+	@./$(TARGET) examples/vista_link/scholarship-demo.workflow.vista --validate-data out/vista-link-demo/reserved.data
+	@node -e 'const fs=require("node:fs"),assert=require("node:assert/strict"),q=s=>"\""+[...Buffer.from(s)].map(b=>String.fromCharCode(92)+"u00"+b.toString(16).padStart(2,"0")).join("")+"\"";const js=fs.readFileSync("out/vista-link-demo/valid/workflow.js","utf8"),from=q("18"),to=q("19");assert.equal(js.split(from).length-1,1);fs.writeFileSync("out/vista-link-demo/mutant.js",js.replace(from,to));'
+	@code=0; ./$(TARGET) examples/vista_link/scholarship-demo.workflow.vista --emit certificate --out-dir out/vista-link-demo/mutated --javascript out/vista-link-demo/mutant.js || code=$$?; test "$$code" = 1
+	@node -e 'const fs=require("node:fs"),assert=require("node:assert/strict"),s=fs.readFileSync("out/vista-link-demo/mutated/workflow.vcert","utf8");assert(s.includes("\nstatus FAIL\n"));for(const key of ["counterexample","counterexample-cli","counterexample-js"]){const line=s.split("\n").find(l=>l.startsWith(key+" "));assert(line&&!line.endsWith(" -"));console.log(key+":\n"+decodeURIComponent(line.slice(key.length+1)));}console.log("Detected age-boundary mutation (expected FAIL); demonstration passed.");'
 
 clean:
 	@rm -rf -- build out

@@ -1,0 +1,8 @@
+workflow ScholarshipDemo {
+  use "applicant.vista" as Applicant
+  use "eligibility.vista" as Eligibility
+  use "certificate.vista" as Certificate
+  start Applicant
+  route Applicant -> Eligibility
+  route Eligibility -> Certificate when Applicant.category == reserved
+}

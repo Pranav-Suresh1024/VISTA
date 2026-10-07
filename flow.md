@@ -1,4 +1,6 @@
-# VISTA executable flow — Task 7 implementation checkpoint
+# VISTA executable flow — Task 9 implementation checkpoint
+
+Tasks 1–8 are accepted at `316dc2d`. Task 9 adds the three-module demo, strict six-mutation replay and explicit pipeline path described below. Supplied-key signature preservation detects the explicit-empty mutant; approved all-type source groups stay within unchanged budgets, while combined rejection is retained. Main coordinates independent acceptance review. Historical checkpoint/count text is retained as provenance, not current count evidence.
 
 Accepted Tasks 1–6 were verified at `c292b60eec92cead5f203241145c3b5f64b86ef6`; this Task 7 implementation starts from `3130c4a0fd24c7042e43a852603c22df60dbfdb1` on `codex/vista-link`, 2026-10-06. [include/version.hpp](include/version.hpp) now reports **0.8.0**. Controller acceptance of Task 7 is separate. [decisions.md](decisions.md) records rationale and checkpoint provenance.
 
@@ -129,6 +131,8 @@ main, --emit partitions
     number_pool / date_pool / string_pool
     per-field classes, including missing/empty/invalid where applicable
     enumerate coordinated assignments -> signature deduplication
+      include supplied-key existence using the existing input-map iterator
+      retain missing versus explicitly supplied empty representatives
   enumerate_route_cases(workflow, partitions)
     inherit generation budget; combine component assignments
     queue start states, keyed by active module + input-class indices
@@ -203,15 +207,16 @@ The submit handler prevents native submission, evaluates the current step, and o
 | Entry point | Current execution |
 | --- | --- |
 | `make test` | Node-free: scalar unit check; scanner/parser; VISTA-Link parser/module/linker/evaluator/partition; semantic/analysis; legacy codegen/Phase 2/templates/validation/pipeline scripts |
-| `make test-vista-link-targets` | Explicit Node-dependent [tests/test_vista_link_codegen.sh](tests/test_vista_link_codegen.sh) and [tests/test_vista_link_certificate.sh](tests/test_vista_link_certificate.sh); depends on the compiler target |
+| `make test-vista-link-targets` | Explicit Node-dependent codegen, certificate/checker, [mutation replay](tests/test_vista_link_mutations.sh), then [pipeline](tests/test_pipeline.sh) `--vista-link`; depends on compiler and checker |
+| `make vista-link-demo` | Three-module certificate/checker, general/reserved CLI paths, expected detected age-boundary mutant |
 | Focused VISTA-Link checks | `bash tests/test_vista_link_parser.sh`, `test_vista_link_module.sh`, `test_vista_link_linker.sh`, `test_vista_link_evaluator.sh`, `test_vista_link_partition.sh`, or `test_vista_link_codegen.sh` using the same `tests/` prefix |
 | Unit entry points | `make test-hash-unit`, `make test-evaluator-scalar`; partition shell test builds/runs `build/test-partition-unit` |
 
 The generated-target script emits real artifacts, compiles a temporary C++ probe against the actual parser/linker/evaluator/partition/codegen sources and transports expected canonical bytes and inputs as hex. Node converts values losslessly with `Buffer.from(hex,'hex').toString('latin1')`, calls the exported byte-mode evaluator, and compares canonical observations byte for byte. Well-formed Unicode inputs also exercise default transport. It executes actual embedded scripts with a small DOM stub, checks progression/escaping/determinism and stale-output failures. The accepted Task 6 report records **2939 comparisons**, including reachable steps and whole cases; this is saved implementation evidence, not a new docs verification run or a real-browser/screen-reader audit. Both ordinary and explicit targets are needed for regression plus generated-target coverage.
 
-## Planned, not implemented at this checkpoint
+## Current acceptance boundary
 
-Task 8 now implements the independent checker below; Task 9's mutation demonstration remains planned. Unsigned hashes are not authenticity, and finite VISTA-derived comparisons do not prove arbitrary JavaScript equivalent for every input.
+Task 8 implements the independent checker below. Task 9 tests six strict mutations and three complete all-type source groups, plus deterministic combined-budget rejection. Unsigned hashes are not authenticity, and finite VISTA-derived comparisons do not prove arbitrary JavaScript equivalent for every input.
 
 ## Task 7 certificate flow
 
@@ -250,3 +255,46 @@ main, --emit certificate --out-dir DIR [--javascript FILE]
 ```
 
 Input evidence is an ASCII hex wire containing whole/step mode, active module, counted prefix and sorted assignments. The certificate codec percent-encodes free text, sorts module/artifact/partition/case records and validates round-trip canonical syntax, unique identities, declared counts and input/coverage hashes. It links only certificate/hash/diagnostic code. `artifact` hashes raw files; canonical workflow prefix and canonical module hashes are separate. Generated sibling paths resolve relative to the certificate; absolute input paths preserve output-directory-independent identity, including non-UTF-8 bytes. Operational failures retain useful probe errors but clear the final certificate. Writes and input reads are not atomic; no runtime timeout is implemented. CERT001/CERT003 yield UNSUPPORTED; CERT002 cycle incompleteness yields FAIL with that diagnostic. This flow records finite source-derived agreement, not authenticity or arbitrary-JavaScript equivalence.
+
+## Task 9 executable demo and regression paths
+
+```text
+make vista-link-demo
+  build compiler + independent checker
+  scholarship-demo.workflow.vista
+    Applicant: required category, exports choice
+    Eligibility: typed Applicant.category import/check, required age 18..120
+    Certificate: unchanged category entry and required filename
+  --emit certificate -> out/vista-link-demo/valid/workflow.vcert
+  vista-cert-check --root . -> VERIFIED with named hashes
+  write general/reserved .data -> --validate-data -> complete CLI observations
+  exact-once generated JS age-boundary edit -> mutant.js
+  --emit certificate --javascript mutant.js -> expected exit 1 / FAIL
+  print reduced input/prefix and both observations; target succeeds on detection
+
+tests/test_pipeline.sh --vista-link
+  two fresh directories: three module.vobj -> linked IR -> partitions
+  real C++/JS certificate -> independent checker VERIFIED
+  compare objects / IR / JS / vcert / partition output byte-for-byte
+  general/reserved actual CLI + generated JS route assertions
+  supplied workflow.js output alias -> exact byte preservation
+  stale scanner/parser/linker/runtime/malformed-probe checks
+  preserve unrelated output file; no recursive user-output cleanup
+
+tests/test_vista_link_mutations.sh
+  six minimal supported source workflows -> baseline cert/checker PASS
+  one asserted exact-once generated target mutation each
+  supplied --javascript -> expected exit 1 / FAIL and differing case hashes
+  parse minimized witness -> C++ parser/linker + actual step/whole evaluator
+  replay original reaching prefix, compare recorded CLI canonical bytes
+  Node actual mutant evaluator + formatter -> recorded JS canonical bytes
+  assert differing field/rule and necessity of retained assignments
+```
+
+All six focused fixtures use one module, so their shortest prefixes are empty; existing certificate tests cover later reachable states and route-preserving reduction. The new teacher mutant also reaches Eligibility through Applicant. No global smallest-value claim is made. All-node probe values remain lossless hex/Latin-1, and observations use counted bytes.
+
+The three expanded test scripts filter actual all-type declaration lines into numeric/date, textual/format and choice/file sources, copying the unchanged Boolean route/Finish sources. Union equality prevents silently omitting a declared type. Each group runs real parsing/linking/partition APIs: 896 + 1216 + 280 = 2392 complete cases. Codegen executes actual C++/JS for every case, both transport modes where valid, plus one concrete full-source case; certificate tests certify and independently verify each group. Original combined inputs must reject deterministically with CERT003 rather than be skipped or treated as complete. The two-module demo has 33 cases; the teacher certificate has 219 (129 step, 90 whole).
+
+Current generated-target total: 3613 canonical C++/JS cases, plus eligible Unicode comparisons and embedded-handler progression. The earlier 2939 total above is Task 6 history. The group sources are independently parsed/linked; removing source fields is test fixture setup, not a production mode or a claim of complete combined Cartesian coverage.
+
+The local ignored `runtime/with-node.sh` supplies verified Node v22.23.3 to a child command; production Makefile expects Node 18+ on PATH. Retain runtime/logs through handoff. No new dependency, original-checkout write, reviewer/subagent, merge or push occurs. Deferred unit-test assertions and the trusted-JS deadline ceiling remain documented in [decisions.md](decisions.md). Final commands and outputs are retained in the local Task 9 report for independent review.

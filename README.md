@@ -2,11 +2,11 @@
 
 VISTA stands for **Validation and Interface Specification Translation Analyzer**.
 
-VISTA will read a small declarative form specification, validate its structure and rules, and generate a simple standalone HTML form when the specification is valid.
+VISTA compiles declarative form specifications, validates editable datasets, and generates standalone HTML. VISTA-Link additionally compiles typed modules, links workflows, generates JavaScript, and records executed C++/JavaScript conformance evidence.
 
 ## Current status
 
-Stages 1 through 6 are complete. VISTA has a repeatable WSL build, positioned Flex scanner, Yacc-compatible Bison parser, C++ AST, field symbol table, semantic analyser, dependency graph, finite witness analysis, standalone HTML generation, and CLI runtime data validation. It includes editable Scholarship, College Admission, and Event Registration starter forms with valid and invalid sample datasets.
+Version **0.8.0** includes the existing form pipeline and VISTA-Link module objects, typed linking, exact bounded partitions, workflow evaluation/code generation, certificate emission and an independent checker. The separate three-module teacher example is `examples/vista_link/scholarship-demo.workflow.vista`; the original two-module scholarship regression fixture is retained. All-type coverage runs in three complete groups derived from the original source; the combined fixture deliberately verifies deterministic resource rejection under unchanged budgets. See [decisions.md](decisions.md) for the decision and review boundaries.
 
 ## Requirements
 
@@ -14,8 +14,9 @@ Stages 1 through 6 are complete. VISTA has a repeatable WSL build, positioned Fl
 - GNU Make
 - G++ with C++17 support
 - GNU Flex and GNU Bison
+- Node.js 18+ on PATH only for certificate execution, generated-target tests and the VISTA-Link demo
 
-The required compiler tools are already available in the current Ubuntu WSL environment.
+Builds, ordinary tests, CLI data validation, workflow generation and the independent checker do not require Node. Local verification uses Node v22.23.3; the stated minimum is not a separate Node 18 test result. The retained WSL runtime wrapper is described in [the workflow guide](docs/VISTA_LINK_DEMO.md#local-wsl-runtime).
 
 ## Build
 
@@ -57,11 +58,15 @@ The token table contains each token's source location, classification, and origi
 ```bash
 make test
 make demo
+make test-vista-link-targets
+make vista-link-demo
 ```
 
-`make test` runs all cumulative checks. Stage 5 tests verify dependency edges, DOT output, self-dependencies, cycles, hidden-required witnesses, and honest analysis-limit diagnostics for unsupported conditions.
+`make test` runs the ordinary cumulative checks without Node. `make test-vista-link-targets` explicitly runs generated-JavaScript comparisons, certificate/checker tests, six real mutations with C++/JS witness replay, and `tests/test_pipeline.sh --vista-link`. Both targets are required for full verification. The all-type numeric/date, textual/format and choice/file groups each retain Boolean routing and Finish; they enumerate 896, 1216 and 280 cases respectively. The combined fixture's 124416 input assignments exceed the unchanged shared ceiling and must produce CERT003/UNSUPPORTED.
 
-Witness analysis exhaustively checks finite Boolean and choice assignments. Numeric, date, and text-dependent reasoning is deliberately reported as `ANL900` rather than approximated.
+The generated-target script executes 3613 canonical C++/JavaScript comparison cases, plus default Unicode comparisons where the bytes are well-formed and embedded-handler progression checks. This includes grouped all-type coverage and one concrete combined-source case; it is not complete coverage of the over-budget combined Cartesian product.
+
+Witness analysis uses exact source-derived classes for supported Boolean, choice, numeric, date, text and format predicates. Unsupported rules or exhausted budgets produce incomplete analysis (`ANL900` for the form analysis adapter), never an approximate success.
 
 `--validate-data` runs a compiled form against an editable `field = value` data file. It checks required and conditionally required fields, visibility, types, choices, email and phone formats, signed numeric and date bounds, text lengths, declarations, and form-level checks. It exits with `0` for a passing dataset, `1` for validation failure, and `2` for command or file errors.
 
@@ -87,6 +92,22 @@ The Scholarship form is an editable source file at `templates/scholarship_applic
 
 For the review walkthrough and current implementation evidence, see [DEMO_GUIDE.md](DEMO_GUIDE.md) and [docs/PHASE_2_PROGRESS.md](docs/PHASE_2_PROGRESS.md).
 
+## VISTA-Link commands and evidence
+
+```bash
+./build/vista examples/vista_link/eligibility.vista --emit module --out-dir out/eligibility
+./build/vista examples/vista_link/scholarship-demo.workflow.vista --emit linked --out-dir out/link
+./build/vista examples/vista_link/scholarship-demo.workflow.vista --emit partitions
+./build/vista examples/vista_link/scholarship-demo.workflow.vista --emit workflow --out-dir out/workflow
+./build/vista examples/vista_link/scholarship-demo.workflow.vista --emit certificate --out-dir out/cert
+./build/vista-cert-check out/cert/workflow.vcert --root .
+./build/vista examples/vista_link/scholarship-demo.workflow.vista --emit certificate --out-dir out/supplied --javascript out/workflow/workflow.js
+```
+
+Module mode writes `module.vobj`; linked mode writes `workflow.ir`; workflow mode writes `workflow.ir`, `workflow.js`, `workflow.html`. Certificate mode adds `workflow.vcert` and local `probe.js`, `probe.out`, `probe.err` execution evidence. PASS means agreement on the complete recorded finite source-derived suite for declared fields, including reachable intermediate states. It does not prove arbitrary JavaScript equivalence. FAIL can contain reduced inputs, state/prefix and both differing observations; incomplete cycles also fail. Unsupported rules or the 100000-state/shared resource ceiling produce UNSUPPORTED, never PASS.
+
+The independent checker checks unsigned recorded coverage consistency and, with `--root .`, named-file hashes. It does not recompile, regenerate partitions, execute targets or authenticate execution. Version-1 source/object paths are raw absolute paths, preserving symlink/`..` meaning; `--root` enables file checking and does not relocate or confine them. Generated siblings are relative to the certificate. Supplied JavaScript runs as trusted local Node code with no sandbox or subprocess timeout. Full commands, budgets, safe cleanup and rollback guidance are in [docs/VISTA_LINK_DEMO.md](docs/VISTA_LINK_DEMO.md).
+
 ## Project layout
 
 ```text
@@ -104,5 +125,5 @@ README.md      Setup and current progress
 ## Exit codes
 
 - `0`: command completed successfully
-- `1`: the source contains a compiler error, or supplied field values fail validation
-- `2`: invalid command-line usage
+- `1`: compiler/validation failure, certificate FAIL/UNSUPPORTED, or rejected/malformed/changed certificate evidence
+- `2`: invalid usage, operational file/runtime/probe failure (module-load diagnostics can instead return 1)

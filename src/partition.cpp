@@ -299,7 +299,8 @@ std::string signature(const std::vector<const LinkedField*>& fields,
         auto it = input.find(f->qualified_name); std::vector<Diagnostic> diagnostics;
         auto value = convert_value(*f, it == input.end() ? nullptr : &it->second, diagnostics);
         values[f->qualified_name] = value;
-        out << value.valid << ':';
+        // Keep missing and supplied-empty probes distinct even when VISTA agrees.
+        out << (it != input.end()) << ':' << value.valid << ':';
         if (f->type == FieldType::Choice) out << value.present;
         const bool can_require = f->requiredness.kind != ExpressionKind::BooleanLiteral || f->requiredness.value != "false";
         if (can_require) out << (!value.present || (f->type == FieldType::Boolean && !value.boolean));
