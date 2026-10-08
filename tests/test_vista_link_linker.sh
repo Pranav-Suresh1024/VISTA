@@ -10,7 +10,8 @@ reject() {
     printf stale >"$root/rejected/workflow.ir"
     local status=0
     link "$1" "$root/rejected" >"$root/error" 2>&1 || status=$?
-    test "$status" -eq 1 || fail "$1 returned $status instead of 1"
+    local expected=${3:-1}
+    test "$status" -eq "$expected" || fail "$1 returned $status instead of $expected"
     grep -Fq "$2" "$root/error" || { cat "$root/error"; fail "missing $2"; }
     test ! -e "$root/rejected/workflow.ir" || fail "stale IR after $2"
     echo "Rejected ${1##*/}: $2 (no IR)"
@@ -32,7 +33,7 @@ done
 cat >"$root/missing.workflow.vista" <<'EOF'
 workflow Missing { use "missing.vista" as Missing start Missing }
 EOF
-reject "$root/missing.workflow.vista" LNK001
+reject "$root/missing.workflow.vista" LNK001 2
 cp examples/vista_link/applicant.vista "$root/modules/applicant.vista"
 cp examples/vista_link/certificate.vista "$root/modules/certificate.vista"
 cat >"$root/modules/collision.vista" <<'EOF'

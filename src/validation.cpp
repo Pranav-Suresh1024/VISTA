@@ -106,6 +106,7 @@ ValidationResult validate_data_file(const FormAst& form,
     ValidationResult result;
     const auto input = load_input_values(data_path, false);
     result.data_opened = input.data_opened;
+    result.operational_failure = input.operational_failure;
     result.diagnostics = input.diagnostics;
     if (!input.data_opened) return result;
     std::map<std::string, SuppliedValue> supplied_values;

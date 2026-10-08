@@ -13,6 +13,7 @@ namespace vista {
 
 struct ValidationResult {
     bool data_opened = false;
+    bool operational_failure = false;
     std::size_t supplied_fields = 0;
     std::size_t checked_fields = 0;
     std::size_t passed_checks = 0;
@@ -20,7 +21,7 @@ struct ValidationResult {
     std::vector<Diagnostic> diagnostics;
 
     bool succeeded() const {
-        return data_opened && diagnostics.empty();
+        return data_opened && !operational_failure && diagnostics.empty();
     }
 };
 

@@ -40,6 +40,10 @@ void inspect(const IrExpression& e, const std::string& rule, Budget& budget,
              std::vector<const IrExpression*>& atoms, std::size_t depth = 0) {
     budget.state();
     if (depth > 256) throw Limit{};
+    if (e.kind == ExpressionKind::IntegerLiteral || e.kind == ExpressionKind::DecimalLiteral) {
+        CanonicalDecimal value;
+        if (!parse_decimal(e.value, value)) throw Unsupported{rule};
+    }
     if (e.kind == ExpressionKind::Unary) {
         if ((e.value != "not" && e.value != "present") || e.operands.size() != 1) throw Unsupported{rule};
         if (e.value == "present") atoms.push_back(&e);

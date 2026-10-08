@@ -109,6 +109,35 @@ int main() {
     observation.diagnostic_codes.push_back("VAL009");
     assert(sorted != canonical_observation(observation));
 
+    observation = invalid.observation;
+    observation.fields.push_back({"A.other", false, true, false});
+    observation.diagnostic_details.push_back({"VAL009", "A.other", "A.check"});
+    observation.diagnostic_codes.push_back("VAL009");
+    const auto unordered = canonical_observation(observation);
+    std::reverse(observation.fields.begin(), observation.fields.end());
+    std::reverse(observation.diagnostic_details.begin(), observation.diagnostic_details.end());
+    std::reverse(observation.diagnostic_codes.begin(), observation.diagnostic_codes.end());
+    assert(unordered == canonical_observation(observation));
+    auto duplicate = observation;
+    duplicate.diagnostic_codes.push_back(duplicate.diagnostic_codes.front());
+    assert(unordered != canonical_observation(duplicate));
+    duplicate = observation;
+    duplicate.diagnostic_details.push_back(duplicate.diagnostic_details.front());
+    assert(unordered != canonical_observation(duplicate));
+
+    // Shifting separators between adjacent byte strings must not collide.
+    EvaluationObservation bytes;
+    bytes.diagnostic_details = {{std::string("x\0:\n", 4), "|y", "r\t"}};
+    auto shifted = bytes;
+    shifted.diagnostic_details = {{std::string("x\0:\n|", 5), "y", "r\t"}};
+    assert(canonical_observation(bytes) != canonical_observation(shifted));
+    bytes.fields = {{std::string("a\0:\n|", 5), true, false, true}};
+    shifted = bytes;
+    shifted.fields[0].field = std::string("a\0:\n", 4);
+    assert(canonical_observation(bytes) != canonical_observation(shifted));
+    const auto controls = canonical_observation(bytes);
+    assert(controls.find(std::string("5:a\0:\n|", 7)) != std::string::npos);
+
     LinkedModule destination;
     destination.alias = "B";
     destination.entry_rule_id = "B.entry";

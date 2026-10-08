@@ -10,14 +10,17 @@ Accepted Tasks 1–6 were verified at `c292b60eec92cead5f203241145c3b5f64b86ef6`
 
 ```text
 main
-  directory mode: prepare_output_directory -> mode-specific stale cleanup
+  reject source identity overlap with mode-touched outputs
+  exception-safe source read
   scan_file(source_path)                       [src/vista.l]
-  format_tokens / scanner diagnostics
-  tokens mode returns here
-  parse_tokens(tokens)                        [src/parser.cpp]
+  unless tokens mode or scanner failure: parse_tokens(tokens) [src/parser.cpp]
     yyparse(context)                          [generated from src/vista.y]
       yylex(semantic_value, location, context) [token adapter in src/parser.cpp]
     duplicate module-export check (MOD003)
+  reject declared module identity overlaps; capture supplied JS snapshot
+  directory mode: prepare_output_directory -> mode-specific stale cleanup
+  format_tokens / scanner diagnostics; tokens mode returns here
+  handle already-collected parse diagnostics
   format_ast(form | module | workflow)         [src/ast.cpp]
   ast mode returns here
   dispatch by emit mode and parsed root
@@ -25,7 +28,7 @@ main
 
 `scan_file` invokes the generated Flex scanner; `yylex` above instead adapts its collected tokens for Bison, including decoded string values and source positions. [include/parser.hpp](include/parser.hpp) requires exactly one root for successful parsing. [src/vista.y](src/vista.y) adds module/workflow roots, qualified names and file presence while retaining contextual identifiers.
 
-Exit codes are 0 for success, 1 for language/validation/incomplete-suite failure and 2 for usage or filesystem failures. Not every I/O error has the same dispatch result: a module-load failure arrives as a linker diagnostic and returns 1. Scanner diagnostics stop before parsing; parse diagnostics stop before semantic/link work. Root/mode checks happen after parsing; unsupported non-form combinations can reach the generic modules/workflows mode error.
+Exit codes are 0 for success, 1 for language/validation/incomplete-suite failure and 2 for usage, identity overlap or operational filesystem failures. LinkResult, InputLoadResult and the legacy ValidationResult adapter carry operational_failure independently of diagnostic text/codes: missing/read-failed modules and data return 2, malformed source/object/data returns 1. Scanner diagnostics stop before parsing; parse diagnostics stop before semantic/link work. Root/mode checks happen after parsing; unsupported non-form combinations can reach the generic modules/workflows mode error. The scan/parse results discovered during preflight are reused, not executed twice.
 
 ## Ordinary form path
 
@@ -196,7 +199,7 @@ The submit handler prevents native submission, evaluates the current step, and o
 
 ## Errors and stale-output cleanup
 
-[src/main.cpp](src/main.cpp) performs directory preparation and cleanup before scanning: `clear_generated_artifacts` removes `module.vobj` for module mode, `form.html` for HTML, or seven named demonstration files for `all`; linked mode removes `workflow.ir`; `clear_workflow_artifacts` attempts all of `workflow.ir`, `workflow.html`, `workflow.js`. Thus missing source, scanner/parser/semantic/link failure or wrong root cannot leave earlier successful workflow output when cleanup succeeds.
+[src/main.cpp](src/main.cpp) checks the top-level source, reads it safely and discovers declared workflow module paths before any output cleanup/write. Existing files use filesystem equivalence (including hardlinks); weak canonical paths resolve existing symlink prefixes before parent components. The exact mode-touched outputs include certificate/probe files where applicable. Any source/module overlap returns 2 without cleanup; intentional supplied-JS aliases are captured before cleanup. `clear_generated_artifacts` removes `module.vobj` for module mode, `form.html` for HTML, or seven named demonstration files for `all`; linked mode removes `workflow.ir`; `clear_workflow_artifacts` attempts all of `workflow.ir`, `workflow.html`, `workflow.js`. Missing/read-failed sources take the normal cleanup path; scanner/parser/semantic/link failures also clear stale artifacts when cleanup succeeds. [include/file_io.hpp](include/file_io.hpp) shares exception-safe binary reads between producer, linker and data loading; module compilation reuses the source bytes already read.
 
 `remove_artifact` reports filesystem errors. Workflow write failures attempt all three removals, including a partly written file. Removal refusal is an explicit failure and may leave files; output is not atomic and no directory is recursively deleted. Legacy `all` may leave already-written diagnostic/intermediate artifacts from the failing attempt. [src/diagnostic.cpp](src/diagnostic.cpp), `format_diagnostic`, supplies positioned scanner/parser/semantic/link messages; workflow validation prints its observation plus messages instead of using that stderr path.
 
@@ -207,7 +210,7 @@ The submit handler prevents native submission, evaluates the current step, and o
 | Entry point | Current execution |
 | --- | --- |
 | `make test` | Node-free: scalar unit check; scanner/parser; VISTA-Link parser/module/linker/evaluator/partition; semantic/analysis; legacy codegen/Phase 2/templates/validation/pipeline scripts |
-| `make test-vista-link-targets` | Explicit Node-dependent codegen, certificate/checker, [mutation replay](tests/test_vista_link_mutations.sh), then [pipeline](tests/test_pipeline.sh) `--vista-link`; depends on compiler and checker |
+| `make test-vista-link-targets` | Focused final-fix regressions, explicit Node-dependent codegen, certificate/checker, [mutation replay](tests/test_vista_link_mutations.sh), then [pipeline](tests/test_pipeline.sh) `--vista-link`; depends on compiler and checker |
 | `make vista-link-demo` | Three-module certificate/checker, general/reserved CLI paths, expected detected age-boundary mutant |
 | Focused VISTA-Link checks | `bash tests/test_vista_link_parser.sh`, `test_vista_link_module.sh`, `test_vista_link_linker.sh`, `test_vista_link_evaluator.sh`, `test_vista_link_partition.sh`, or `test_vista_link_codegen.sh` using the same `tests/` prefix |
 | Unit entry points | `make test-hash-unit`, `make test-evaluator-scalar`; partition shell test builds/runs `build/test-partition-unit` |
@@ -226,14 +229,17 @@ With `--root .`, it reopens all recorded raw files, recomputes their SHA-256, ch
 
 ```text
 main, --emit certificate --out-dir DIR [--javascript FILE]
-  reject workflow input/output overlap
-  read exact supplied JavaScript and workflow bytes before cleanup
+  reject workflow source identity overlap; exception-safe source read
+  scan / parse -> reject all declared module input/output identities
+  read exact supplied JavaScript snapshot before cleanup
   prepare directory -> remove stale vcert and workflow artifacts
-  scan / parse -> read raw named module inputs -> link_workflow
+  reuse scan / parse -> read raw named module inputs -> link_workflow
   choose supplied bytes or generate_workflow_javascript
   generate_workflow_html -> format_linked_workflow
   write workflow.ir / workflow.js / workflow.html
-  derive_partitions -> enumerate_route_cases
+  derive_partitions: canonical-parse every numeric literal in every rule
+    field-free / runtime-unreached literals included; invalid -> CERT001
+  enumerate_route_cases
   certify_workflow                                  [src/certify.cpp]
     independently derive expected suite; validate completeness and identities
     retain scalar/component IDs, expected counts, canonical module hashes
@@ -297,4 +303,4 @@ The partition, codegen and certificate test scripts each invoke `bash tests/crea
 
 Current generated-target total: 3613 canonical C++/JS cases, plus eligible Unicode comparisons and embedded-handler progression. The earlier 2939 total above is Task 6 history. The group sources are independently parsed/linked; removing source fields is test fixture setup, not a production mode or a claim of complete combined Cartesian coverage.
 
-The local ignored `runtime/with-node.sh` supplies verified Node v22.23.3 to a child command; production Makefile expects Node 18+ on PATH. Retain runtime/logs through handoff. No new dependency, original-checkout write, reviewer/subagent, merge or push occurs. Deferred unit-test assertions and the trusted-JS deadline ceiling remain documented in [decisions.md](decisions.md). Final commands and outputs are retained in the local Task 9 report for independent review.
+The local ignored `runtime/with-node.sh` supplies verified Node v22.23.3 to a child command; production Makefile expects Node 18+ on PATH. Retain runtime/logs through handoff. No new dependency, original-checkout write, reviewer/subagent, merge or push occurs. Final-wave tests close the two deferred unit assertion gaps; the trusted-JS deadline ceiling remains documented in [decisions.md](decisions.md). Task 9 commands are historical evidence; final-wave focused commands/results are retained in the local `final-fix-report.md` for scoped rereview and controller-owned full acceptance.

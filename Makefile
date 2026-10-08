@@ -12,7 +12,9 @@ GENERATED_PARSER_HEADER := build/vista_parser.hpp
 SOURCES := src/main.cpp src/analysis.cpp src/ast.cpp src/certificate.cpp src/certify.cpp src/codegen.cpp src/diagnostic.cpp src/evaluator.cpp src/hash.cpp src/linker.cpp src/module.cpp src/parser.cpp src/partition.cpp src/semantic.cpp src/token.cpp src/validation.cpp
 HEADERS := include/analysis.hpp include/ast.hpp include/certificate.hpp include/certify.hpp include/codegen.hpp include/diagnostic.hpp include/evaluator.hpp include/hash.hpp include/linker.hpp include/module.hpp include/parser.hpp include/partition.hpp include/scanner.hpp include/semantic.hpp include/token.hpp include/validation.hpp include/version.hpp include/workflow.hpp
 
-.PHONY: all test test-vista-link-targets test-hash-unit test-evaluator-scalar demo vista-link-demo clean
+HEADERS += include/file_io.hpp
+
+.PHONY: all test test-vista-link-targets test-vista-link-final-fixes test-hash-unit test-evaluator-scalar demo vista-link-demo clean
 
 all: $(TARGET) build/vista-cert-check
 
@@ -51,10 +53,14 @@ test: $(TARGET)
 	@bash tests/test_pipeline.sh
 
 test-vista-link-targets: $(TARGET) build/vista-cert-check
+	@$(MAKE) --no-print-directory test-vista-link-final-fixes
 	@bash tests/test_vista_link_codegen.sh
 	@bash tests/test_vista_link_certificate.sh
 	@bash tests/test_vista_link_mutations.sh
 	@bash tests/test_pipeline.sh --vista-link
+
+test-vista-link-final-fixes: $(TARGET) build/vista-cert-check
+	@bash tests/test_vista_link_final_fixes.sh
 
 test-hash-unit: build/test_hash_unit
 	@./build/test_hash_unit

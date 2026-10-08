@@ -11,9 +11,10 @@ struct InputLoadResult {
     InputValues values;
     std::vector<Diagnostic> diagnostics;
     bool data_opened = false;
+    bool operational_failure = false;
     std::map<std::string, std::size_t> lines;
     std::vector<std::string> supplied_order;
-    bool succeeded() const { return data_opened && diagnostics.empty(); }
+    bool succeeded() const { return data_opened && !operational_failure && diagnostics.empty(); }
 };
 
 // value = sign * digits * 10^(-scale). Zero has sign 0, digits "0", scale 0.

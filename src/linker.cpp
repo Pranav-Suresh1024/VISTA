@@ -12,6 +12,7 @@
 #include <tuple>
 
 #include "hash.hpp"
+#include "file_io.hpp"
 #include "module.hpp"
 #include "parser.hpp"
 #include "scanner.hpp"
@@ -67,14 +68,10 @@ struct LoadedModule {
 bool load_module(const WorkflowUse& use, const std::filesystem::path& base,
                  LoadedModule& loaded, LinkResult& result) {
     const auto path = base / use.source_path;
-    std::ifstream input(path, std::ios::binary);
-    if (!input) {
+    std::string bytes;
+    if (!read_binary_file(path, bytes)) {
+        result.operational_failure = true;
         diagnose(result, "LNK001", "cannot read module '" + path.string() + "'", use.span);
-        return false;
-    }
-    const std::string bytes((std::istreambuf_iterator<char>(input)), {});
-    if (input.bad()) {
-        diagnose(result, "LNK001", "failed reading module '" + path.string() + "'", use.span);
         return false;
     }
     std::string source;
@@ -100,11 +97,13 @@ bool load_module(const WorkflowUse& use, const std::filesystem::path& base,
     }
     SourceFile temporary;
     if (!temporary.write(source)) {
+        result.operational_failure = true;
         diagnose(result, "LNK001", "cannot prepare module source for scanner", use.span);
         return false;
     }
     const auto scan = scan_file(temporary.path.string());
     if (!scan.input_opened || !scan.diagnostics.empty()) {
+        if (!scan.input_opened) result.operational_failure = true;
         diagnose(result, "LNK001", "cannot scan module '" + use.alias + "'", use.span);
         for (const auto& diagnostic : scan.diagnostics)
             diagnose(result, diagnostic.code, use.alias + ": " + diagnostic.message, use.span);

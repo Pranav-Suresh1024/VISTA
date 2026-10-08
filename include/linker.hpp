@@ -10,7 +10,8 @@ namespace vista {
 struct LinkResult {
     LinkedWorkflow workflow;
     std::vector<Diagnostic> diagnostics;
-    bool succeeded() const { return diagnostics.empty(); }
+    bool operational_failure = false;
+    bool succeeded() const { return !operational_failure && diagnostics.empty(); }
 };
 
 LinkResult link_workflow(const WorkflowAst& workflow,

@@ -126,4 +126,6 @@ README.md      Setup and current progress
 
 - `0`: command completed successfully
 - `1`: compiler/validation failure, certificate FAIL/UNSUPPORTED, or rejected/malformed/changed certificate evidence
-- `2`: invalid usage, operational file/runtime/probe failure (module-load diagnostics can instead return 1)
+- `2`: invalid usage, input/output identity overlap, or operational file/runtime/probe failure, including module and data reads
+
+Every emitting mode checks source and declared module input identities against its touched outputs before cleanup or writes. Supplied JavaScript may intentionally alias `workflow.js`: its bytes are captured before cleanup. Workflow routes accept `present(A.attachment)` for exported file fields (missing/empty is absent; any nonempty value is present). Every source numeric literal must fit the canonical parser, including field-free and runtime-unreached expressions; unsupported literals cannot receive PASS. Malformed source, objects and data remain exit 1.

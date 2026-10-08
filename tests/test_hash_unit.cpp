@@ -58,6 +58,7 @@ int main() {
     }
 
     std::ifstream input("examples/vista_link/errors/tampered.vobj", std::ios::binary);
+    expect(input.is_open(), "tampered object fixture must open");
     const std::string bytes((std::istreambuf_iterator<char>(input)),
                             std::istreambuf_iterator<char>());
     const vista::ModuleLoadResult loaded = vista::load_module_object(bytes);

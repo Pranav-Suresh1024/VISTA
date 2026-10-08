@@ -12,6 +12,7 @@
 #include "codegen.hpp"
 #include "certify.hpp"
 #include "hash.hpp"
+#include "file_io.hpp"
 #include "diagnostic.hpp"
 #include "module.hpp"
 #include "linker.hpp"
@@ -167,11 +168,9 @@ bool read_bytes(const std::filesystem::path& path, std::string& content) {
     if (path.string().find('\0') != std::string::npos) {
         std::cerr << "VISTA: NUL in input path\n"; return false;
     }
-    std::ifstream input(path, std::ios::binary);
-    if (!input) { std::cerr << "VISTA: cannot read input '" << path.string() << "'\n"; return false; }
-    content.assign(std::istreambuf_iterator<char>(input), std::istreambuf_iterator<char>());
-    if (input.bad()) { std::cerr << "VISTA: failed reading input '" << path.string() << "'\n"; return false; }
-    return true;
+    if (vista::read_binary_file(path, content)) return true;
+    std::cerr << "VISTA: cannot read input '" << path.string() << "'\n";
+    return false;
 }
 
 bool clear_generated_artifacts(const std::filesystem::path& directory,
@@ -277,35 +276,63 @@ int main(int argc, char* argv[]) {
 
     const bool all_mode = emit_mode == "all";
     const std::filesystem::path output_directory = directory_mode ? argv[5] : "";
-    std::string exact_javascript, workflow_source_bytes;
-    if (certificate_mode) {
-        // Protect the supplied target from cleanup, including output/workflow.js aliases.
-        // Reject workflow source overlap before removing any named artifact.
-        for (const auto* file : {"workflow.ir", "workflow.html", "workflow.js", "workflow.vcert", "probe.js", "probe.out", "probe.err"}) {
+    std::vector<std::string> touched_outputs;
+    if (certificate_mode) touched_outputs = {"workflow.ir", "workflow.html", "workflow.js", "workflow.vcert", "probe.js", "probe.out", "probe.err"};
+    else if (workflow_mode) touched_outputs = {"workflow.ir", "workflow.html", "workflow.js"};
+    else if (linked_mode) touched_outputs = {"workflow.ir"};
+    else if (module_mode) touched_outputs = {"module.vobj"};
+    else if (all_mode) touched_outputs = {"tokens.txt", "ast.txt", "symbols.txt", "dependencies.txt", "graph.dot", "diagnostics.txt", "form.html"};
+    else if (directory_mode) touched_outputs = {"form.html"};
+    const auto overlaps_output = [&](const std::filesystem::path& input) {
+        for (const auto& file : touched_outputs) {
+            const auto output = output_directory / file;
             std::error_code error;
-            if (std::filesystem::absolute(source_path).lexically_normal() == std::filesystem::absolute(output_directory/file).lexically_normal() ||
-                std::filesystem::equivalent(source_path, output_directory/file, error)) {
-                std::cerr << "VISTA: workflow input overlaps certificate output\n"; return 2;
+            if (std::filesystem::equivalent(input, output, error)) return true;
+            // Resolve existing prefixes before .., including nonexisting output leaves.
+            const auto resolved_input = std::filesystem::weakly_canonical(input, error);
+            if (error) continue;
+            const auto resolved_output = std::filesystem::weakly_canonical(output, error);
+            if (!error && resolved_input == resolved_output) return true;
+        }
+        return false;
+    };
+    if (overlaps_output(source_path)) {
+        std::cerr << "VISTA: source input overlaps output\n"; return 2;
+    }
+    const auto clear_outputs = [&]() {
+        return certificate_mode ? (remove_artifact(output_directory,"workflow.vcert") && clear_workflow_artifacts(output_directory)) :
+               workflow_mode ? clear_workflow_artifacts(output_directory) :
+               linked_mode ? remove_artifact(output_directory, "workflow.ir") :
+               clear_generated_artifacts(output_directory, all_mode, module_mode);
+    };
+    std::string exact_javascript, workflow_source_bytes;
+    if (!read_bytes(source_path, workflow_source_bytes)) {
+        if (directory_mode) clear_outputs();
+        return 2;
+    }
+    const vista::ScanResult scan_result = vista::scan_file(source_path);
+    vista::ParseResult parse_result;
+    if (emit_mode != "tokens" && scan_result.input_opened && scan_result.diagnostics.empty())
+        parse_result = vista::parse_tokens(scan_result.tokens);
+    if (parse_result.workflow != nullptr) {
+        for (const auto* use : parse_result.workflow->uses) {
+            if (overlaps_output(std::filesystem::path(source_path).parent_path() / use->source_path)) {
+                std::cerr << "VISTA: module input overlaps output\n"; return 2;
             }
         }
+    }
+    if (certificate_mode) {
+        // Protect the supplied target from cleanup, including output/workflow.js aliases.
         if (supplied_javascript && !read_bytes(argv[7],exact_javascript)) {
-            remove_artifact(output_directory,"workflow.vcert"); return 2;
-        }
-        if (!read_bytes(source_path,workflow_source_bytes)) {
             remove_artifact(output_directory,"workflow.vcert"); return 2;
         }
     }
     if (directory_mode) {
-        if (!prepare_output_directory(output_directory) ||
-            !(certificate_mode ? (remove_artifact(output_directory,"workflow.vcert") && clear_workflow_artifacts(output_directory)) :
-              workflow_mode ? clear_workflow_artifacts(output_directory) :
-              linked_mode ? remove_artifact(output_directory, "workflow.ir") :
-              clear_generated_artifacts(output_directory, all_mode, module_mode))) {
+        if (!prepare_output_directory(output_directory) || !clear_outputs()) {
             return 2;
         }
     }
 
-    const vista::ScanResult scan_result = vista::scan_file(source_path);
     if (!scan_result.input_opened) {
         std::cerr << "VISTA: cannot open input file '" << source_path << "'\n";
         return 2;
@@ -329,7 +356,6 @@ int main(int argc, char* argv[]) {
         return 0;
     }
 
-    const vista::ParseResult parse_result = vista::parse_tokens(scan_result.tokens);
     if (!parse_result.succeeded()) {
         print_diagnostics(source_path, parse_result.diagnostics);
         if (all_mode && !write_failure_diagnostics(
@@ -370,7 +396,7 @@ int main(int argc, char* argv[]) {
         }
         const auto linked = vista::link_workflow(*parse_result.workflow, source_path);
         print_diagnostics(source_path, linked.diagnostics);
-        if (!linked.succeeded()) return 1;
+        if (!linked.succeeded()) return linked.operational_failure ? 2 : 1;
         if (emit_mode == "partitions") {
             const auto partitions = vista::derive_partitions(linked.workflow);
             const auto suite = vista::enumerate_route_cases(linked.workflow, partitions);
@@ -416,19 +442,8 @@ int main(int argc, char* argv[]) {
             std::cerr << "VISTA: --emit module requires a module source\n";
             return 2;
         }
-        std::ifstream source_file(source_path, std::ios::binary);
-        if (!source_file) {
-            std::cerr << "VISTA: cannot reopen input file '" << source_path << "'\n";
-            return 2;
-        }
-        const std::string source_text((std::istreambuf_iterator<char>(source_file)),
-                                      std::istreambuf_iterator<char>());
-        if (source_file.bad()) {
-            std::cerr << "VISTA: failed while reading input file '" << source_path << "'\n";
-            return 2;
-        }
         const vista::ModuleCompileResult module_result =
-            vista::compile_module(*parse_result.module, source_text);
+            vista::compile_module(*parse_result.module, workflow_source_bytes);
         print_diagnostics(source_path, module_result.diagnostics);
         if (!module_result.succeeded()) {
             return 1;
@@ -445,7 +460,7 @@ int main(int argc, char* argv[]) {
     if (validation_mode && parse_result.workflow != nullptr) {
         const auto linked = vista::link_workflow(*parse_result.workflow, source_path);
         print_diagnostics(source_path, linked.diagnostics);
-        if (!linked.succeeded()) return 1;
+        if (!linked.succeeded()) return linked.operational_failure ? 2 : 1;
         const auto input = vista::load_input_values(argv[3]);
         auto evaluation = vista::evaluate_workflow(linked.workflow, input.values);
         for (const auto& diagnostic : input.diagnostics) {
@@ -457,7 +472,7 @@ int main(int argc, char* argv[]) {
         std::cout << vista::format_observation(evaluation.observation);
         for (const auto& diagnostic : evaluation.diagnostics)
             std::cout << "  " << diagnostic.code << ": " << diagnostic.message << '\n';
-        if (!input.data_opened) return 2;
+        if (input.operational_failure) return 2;
         return evaluation.succeeded() ? 0 : 1;
     }
     if (parse_result.form == nullptr) {
@@ -520,7 +535,7 @@ int main(int argc, char* argv[]) {
         const vista::ValidationResult validation =
             vista::validate_data_file(*parse_result.form, semantic_result, argv[3]);
         std::cout << vista::format_validation_report(validation);
-        if (!validation.data_opened) {
+        if (validation.operational_failure) {
             return 2;
         }
         return validation.succeeded() ? 0 : 1;

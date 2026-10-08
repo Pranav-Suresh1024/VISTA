@@ -593,6 +593,15 @@ expression:
             vista::ExpressionKind::Unary, "present", make_span(@1, @4), operand);
         delete $3;
     }
+  | PRESENT LEFT_PAREN identifier DOT identifier RIGHT_PAREN
+    {
+        vista::Expression* operand = context.result.arena.make<vista::Expression>(
+            vista::ExpressionKind::Name, *$3 + "." + *$5, make_span(@3, @5));
+        $$ = context.result.arena.make<vista::Expression>(
+            vista::ExpressionKind::Unary, "present", make_span(@1, @6), operand);
+        delete $3;
+        delete $5;
+    }
   | expression OR expression
     {
         $$ = context.result.arena.make<vista::Expression>(

@@ -1,4 +1,5 @@
 #include "evaluator.hpp"
+#include "file_io.hpp"
 
 #include <algorithm>
 #include <fstream>
@@ -391,12 +392,16 @@ bool evaluate_expression(const IrExpression& expression, const RuntimeValues& va
 
 InputLoadResult load_input_values(const std::string& path, bool qualified_names) {
     InputLoadResult result;
-    std::ifstream input(path);
+    std::string bytes;
     auto error = [&](const std::string& code, const std::string& message, std::size_t line = 0) {
         result.diagnostics.push_back({code, message, line, line ? 1U : 0U});
     };
-    if (!input) { error("VAL000", "cannot open data file '" + path + "'"); return result; }
+    if (!read_binary_file(path, bytes)) {
+        result.operational_failure = true;
+        error("VAL000", "cannot read data file '" + path + "'"); return result;
+    }
     result.data_opened = true;
+    std::istringstream input(bytes);
     std::string line;
     std::size_t number = 0;
     while (std::getline(input, line)) {
@@ -417,7 +422,6 @@ InputLoadResult load_input_values(const std::string& path, bool qualified_names)
             error("VAL002", "field '" + name + "' is assigned more than once", number);
         else { result.lines[name] = number; result.supplied_order.push_back(name); }
     }
-    if (input.bad()) error("VAL000", "failed reading data file '" + path + "'");
     return result;
 }
 

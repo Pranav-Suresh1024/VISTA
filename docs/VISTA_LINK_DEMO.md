@@ -79,6 +79,8 @@ Change age to 17, use a malformed integer, or remove the reserved certificate va
 
 Module paths resolve relative to the workflow source, not the terminal directory. `.vobj` can replace a `.vista` in a workflow `use`; the linker validates its digests and reparses/recompiles its embedded source contract. No edits to existing fixtures are needed for this demo.
 
+Routes accept exported file-presence conditions such as `route A -> B when present(A.attachment)`. Missing and supplied-empty values are absent; any nonempty value is present. Local/imported `present(attachment)` and contextual identifiers remain supported. The focused `make test-vista-link-final-fixes` target checks this source-to-Node/certificate path, filesystem aliases, read failures and numeric admission; it requires Node and is included in the explicit target gate.
+
 `workflow.js` exports `vistaEvaluate(input, activeModule?, options?)` and `vistaCanonicalObservation(result)`. Omit activeModule for full traversal; supply an alias for one step. Input values are strings. Default Unicode mode converts values to UTF-8 bytes; `{inputMode:'bytes'}` accepts Latin-1 containers for lossless arbitrary-byte testing. Browser handlers use this same generated evaluator. The checker does not execute this API.
 
 ## Meaning and limits of evidence
@@ -88,6 +90,8 @@ PASS records agreement over the complete generated finite suite of declared work
 FAIL with CERT004 records the first mismatch by stable shortest-prefix ordering, a deterministic sorted assignment-deletion reduction preserving that state/prefix, and both actual canonical observations. Reduction is not a global search for the smallest possible values. A reachable nonterminating cycle produces incomplete FAIL with CERT002; it need not contain a semantic mismatch witness.
 
 CERT001 (unknown exact rule) and CERT003 (resource exhaustion) produce UNSUPPORTED with incomplete coverage, never PASS. All field types—text, textarea, email, phone, integer, decimal, Boolean, date, choice and file—have supported validation classes. The shared ceiling is 100000 generation/exploration work states and 6400000 retained payload bytes, with guarded DFA allocation, 256 depth/component dimensions and 4096-byte numeric construction. Scalar numeric input has 4096 bytes and absolute exponent/normalized scale 100000 bounds. Conservative construction limits can reject a workflow before 100000 route states; these limits are not subprocess timeouts.
+
+Supported-language inspection applies the canonical numeric parser to every source numeric literal, including constant-only predicates, entry/check/field rules and rules not reached at runtime. Unrepresentable literals produce CERT001/UNSUPPORTED; agreement on invalid source semantics cannot PASS. Supported respondent conversion/validation failures remain ordinary certifiable observations.
 
 The independent executable links only checker, certificate codec, hash and diagnostic sources. It validates canonical syntax, complete recorded case/manifest consistency, matching observation hashes and named identities. With `--root .`, it reopens all recorded source/module/object/generated files and recomputes hashes. It does not parse source semantics, recreate partitions, rebuild source contracts, rerun either evaluator or authenticate execution. Without `--root` it checks recorded consistency only.
 
@@ -101,9 +105,9 @@ Supplied JavaScript executes as trusted local Node code with the process's acces
 | --- | --- |
 | 0 | Successful operation; PASS certificate or VERIFIED checker |
 | 1 | Source/validation failure, FAIL or UNSUPPORTED certificate, malformed/rejected evidence or changed/missing recorded artifact |
-| 2 | Usage or operational file/runtime/probe error; compiler module-load diagnostics may instead return 1 |
+| 2 | Usage, input/output identity overlap, or operational file/runtime/probe error, including module/data reads |
 
-Certificate mode reads supplied JS before removing known stale artifacts, so `--javascript DIR/workflow.js` may overlap its output safely. Workflow input/output overlap is rejected. Scanner/parser/linker failure clears stale final workflow artifacts when cleanup succeeds; runtime/malformed-probe failure leaves no final certificate, but generated IR/JS/HTML/probe diagnostics can remain for investigation. No recursive user-output directory deletion occurs. Filesystem refusal prevents a universal cleanup guarantee. `make clean` separately removes this checkout's `build` and `out`; preserve wanted files there before using it.
+Every emitting mode checks the top-level source and declared module input filesystem identities against its exact touched outputs before cleanup or writes, including hardlinks, symlinks and parent components. Overlap refusal leaves inputs and outputs untouched. Certificate mode captures supplied JS before cleanup, so intentional `--javascript DIR/workflow.js` snapshots remain supported. Exception-safe source/module/JS/data reads return operational exit 2 and clear stale certificate evidence when cleanup succeeds; malformed source/object/data remains exit 1. Scanner/parser/linker failure clears stale final workflow artifacts when cleanup succeeds; runtime/malformed-probe failure leaves no final certificate, but generated IR/JS/HTML/probe diagnostics can remain for investigation. No recursive user-output directory deletion occurs. Filesystem refusal prevents a universal cleanup guarantee; concurrent file mutation and atomic publication are outside this contract. `make clean` separately removes this checkout's `build` and `out`; preserve wanted files there before using it.
 
 ## Verification and deterministic rebuild
 
