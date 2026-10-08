@@ -1,4 +1,21 @@
-# VISTA-Link decisions — Task 9 implementation checkpoint
+# VISTA-Link decisions — verified implementation
+
+## Final acceptance — 2026-10-08
+
+The approved Tasks 1–9 and final review corrections are complete at code checkpoint `def2b3025f6cfe3e49d13af64ffa7f3f5bf903a3`. Independent whole-branch and scoped reviews closed F1–F5 and the two deferred unit-test gaps. The controller then ran `controller-final-verify.sh` from a clean build; the complete command exited **0**, ending `Controller full verification completed.` No product code changed after this run.
+
+| Fresh check | Result |
+| --- | --- |
+| `make clean` and `make` | Passed with warnings treated as errors |
+| `make test`, without Node on PATH | Passed, including legacy form regressions |
+| `make test-vista-link-targets`, using the local Node wrapper | Passed: final-fix regressions, 3613 C++/JS comparisons, certificate/checker adversaries, six real mutations with witness replay, and deterministic full pipeline |
+| `make vista-link-demo`, using the same wrapper | Passed: valid certificate VERIFIED, both sample routes accepted, expected age-boundary mutant detected |
+
+Local full output is retained in `.superpowers/sdd/2026-10-05-vista-link/controller-final-verification-2026-10-08.log`; that evidence/runtime directory is intentionally ignored and preserved locally. The combined oversized all-type fixture still correctly reports CERT003/UNSUPPORTED; complete source groups cover 896 + 1216 + 280 = 2392 cases without raising budgets. Expected negative-case diagnostics are asserted outcomes, not failed checks.
+
+Implementation remains on `codex/vista-link`; the original checkout and baseline `510059d9c7878e322e6cb5c4cd0822d42861f199` remain unchanged. No merge or push is authorized. Retain local evidence and the available Node wrapper through the user's integration choice rather than deleting the only runnable verification runtime. Cost: ignored local disk usage. Integration is a separate user decision.
+
+Known limits remain explicit: trusted JavaScript has no sandbox/deadline; ambiguous or input-aliasing failed compilations can retain unusable old evidence; no real-browser/accessibility or native-Windows compiler audit was performed. Certificate PASS remains bounded source-derived execution evidence, not arbitrary JavaScript equivalence or authenticity. Sections below preserve historical checkpoints and reasoning, not pending implementation status.
 
 Tasks 1–8 are accepted at base `316dc2d336154c9a15fc40037b363d27af288203`. Task 9 implements strict mutation replay, a separate three-module demo and pipeline checks. Distinguishing supplied-key presence makes the combined all-type fixture exceed unchanged resource limits; approved source-derived groups retain complete per-group coverage while combined rejection remains tested. All six focused mutations detect real disagreement, including supplied-empty text. Version remains 0.8.0; main coordinates independent task/whole-branch review. Earlier checkpoint prose below is retained as historical rationale, not current pending-task status.
 

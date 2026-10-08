@@ -1,4 +1,8 @@
-# VISTA executable flow — Task 9 implementation checkpoint
+# VISTA executable flow — verified implementation
+
+## Current acceptance — 2026-10-08
+
+The complete implementation and reviewed corrections are verified at code checkpoint `def2b3025f6cfe3e49d13af64ffa7f3f5bf903a3`. A fresh controller-owned clean build, ordinary Node-free suite, explicit generated-target/certificate/mutation/pipeline suite and teacher demo all completed in one command with exit **0**. That run includes 3613 canonical C++/JS comparisons, six actual mutant witness replays, deterministic artifact comparisons and a valid VERIFIED three-module certificate. See [decisions.md](decisions.md) for the exact acceptance checks, local log location and limits. The execution descriptions below include later correction sections; older checkpoint paragraphs are historical provenance, not unfinished tasks. Integration into the original checkout remains the user's choice.
 
 Tasks 1–8 are accepted at `316dc2d`. Task 9 adds the three-module demo, strict six-mutation replay and explicit pipeline path described below. Supplied-key signature preservation detects the explicit-empty mutant; approved all-type source groups stay within unchanged budgets, while combined rejection is retained. Main coordinates independent acceptance review. Historical checkpoint/count text is retained as provenance, not current count evidence.
 
