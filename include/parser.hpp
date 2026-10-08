@@ -16,6 +16,9 @@ struct ParseResult {
     ModuleAst* module = nullptr;
     WorkflowAst* workflow = nullptr;
     std::vector<Diagnostic> diagnostics;
+    // Conservative token inventory survives an unfinished workflow production.
+    std::vector<std::string> module_input_paths;
+    bool module_inputs_known = true;
 
     bool succeeded() const {
         const int root_count = (form != nullptr ? 1 : 0) +

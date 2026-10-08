@@ -283,17 +283,18 @@ int main(int argc, char* argv[]) {
     else if (module_mode) touched_outputs = {"module.vobj"};
     else if (all_mode) touched_outputs = {"tokens.txt", "ast.txt", "symbols.txt", "dependencies.txt", "graph.dot", "diagnostics.txt", "form.html"};
     else if (directory_mode) touched_outputs = {"form.html"};
+    const auto same_file = [](const std::filesystem::path& input, const std::filesystem::path& output) {
+        std::error_code error;
+        if (std::filesystem::equivalent(input, output, error)) return true;
+        // Resolve existing prefixes before .., including nonexisting output leaves.
+        const auto resolved_input = std::filesystem::weakly_canonical(input, error);
+        if (error) return false;
+        const auto resolved_output = std::filesystem::weakly_canonical(output, error);
+        return !error && resolved_input == resolved_output;
+    };
     const auto overlaps_output = [&](const std::filesystem::path& input) {
-        for (const auto& file : touched_outputs) {
-            const auto output = output_directory / file;
-            std::error_code error;
-            if (std::filesystem::equivalent(input, output, error)) return true;
-            // Resolve existing prefixes before .., including nonexisting output leaves.
-            const auto resolved_input = std::filesystem::weakly_canonical(input, error);
-            if (error) continue;
-            const auto resolved_output = std::filesystem::weakly_canonical(output, error);
-            if (!error && resolved_input == resolved_output) return true;
-        }
+        for (const auto& file : touched_outputs)
+            if (same_file(input, output_directory / file)) return true;
         return false;
     };
     if (overlaps_output(source_path)) {
@@ -312,8 +313,41 @@ int main(int argc, char* argv[]) {
     }
     const vista::ScanResult scan_result = vista::scan_file(source_path);
     vista::ParseResult parse_result;
-    if (emit_mode != "tokens" && scan_result.input_opened && scan_result.diagnostics.empty())
+    if (emit_mode != "tokens" && scan_result.input_opened &&
+        (scan_result.diagnostics.empty() || directory_mode))
         parse_result = vista::parse_tokens(scan_result.tokens);
+    if (directory_mode && scan_result.input_opened &&
+        (!scan_result.diagnostics.empty() || !parse_result.succeeded())) {
+        bool inventory_known = parse_result.module_inputs_known;
+        for (const auto& diagnostic : scan_result.diagnostics)
+            if (diagnostic.code == "LEX002") inventory_known = false;
+        std::vector<std::filesystem::path> module_inputs;
+        bool overlap = false;
+        for (const auto& path : parse_result.module_input_paths) {
+            module_inputs.push_back(std::filesystem::path(source_path).parent_path() / path);
+            overlap = overlaps_output(module_inputs.back()) || overlap;
+        }
+        if (!inventory_known || overlap) {
+            print_diagnostics(source_path, scan_result.diagnostics.empty() ?
+                              parse_result.diagnostics : scan_result.diagnostics);
+            if (!inventory_known) {
+                std::cerr << "VISTA: preserving outputs: module input inventory is incomplete; old evidence is unusable\n";
+                return 1;
+            }
+            bool cleared = true;
+            for (const auto& file : touched_outputs) {
+                // Probe files were never part of stale-final-artifact cleanup.
+                if (certificate_mode && file.rfind("probe.", 0) == 0) continue;
+                bool protected_input = false;
+                for (const auto& input : module_inputs)
+                    protected_input = same_file(input, output_directory / file) || protected_input;
+                if (protected_input)
+                    std::cerr << "VISTA: preserving module input/output '" << file << "'; old evidence is unusable\n";
+                else cleared = remove_artifact(output_directory, file) && cleared;
+            }
+            return cleared ? 1 : 2;
+        }
+    }
     if (parse_result.workflow != nullptr) {
         for (const auto* use : parse_result.workflow->uses) {
             if (overlaps_output(std::filesystem::path(source_path).parent_path() / use->source_path)) {

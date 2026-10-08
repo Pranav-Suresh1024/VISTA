@@ -14,6 +14,63 @@ printf 'module A { field attachment: file { label "Attachment" } export attachme
 printf 'module B {}\n' > "$tmp/b.vista"
 printf 'workflow W { use "a.vista" as A use "b.vista" as B start A route A -> B }\n' > "$tmp/main.vista"
 group=${1:-all}
+if [[ $group = F1 || $group = F1-ambiguous || $group = all ]]; then
+    for failure in scanner parser; do
+        for mode in workflow certificate linked all; do
+            directory="$tmp/ambiguous-$failure-$mode"
+            mkdir -p "$directory/out"
+            for file in workflow.ir workflow.js workflow.html workflow.vcert tokens.txt diagnostics.txt; do
+                printf 'preserve unknown input\n' > "$directory/out/$file"
+            done
+            if [[ $failure = scanner ]]; then printf 'workflow W { use "unfinished\n' > "$directory/main.vista";
+            else printf 'workflow W { use Missing }\n' > "$directory/main.vista"; fi
+            expect_exit 1 "$binary" "$directory/main.vista" --emit "$mode" --out-dir "$directory/out"
+            for file in workflow.ir workflow.js workflow.html workflow.vcert tokens.txt diagnostics.txt; do
+                cmp "$directory/out/$file" <(printf 'preserve unknown input\n') || fail 'ambiguous inventory changed output'
+            done
+            grep -q 'inventory is incomplete; old evidence is unusable' "$tmp/log"
+        done
+    done
+    echo 'F1 ambiguous inventories preserve outputs with unusable-evidence warning.'
+fi
+if [[ $group = F1 || $group = F1-scanner || $group = F1-parser || $group = all ]]; then
+    for failure in scanner parser parser-before-use; do
+        [[ $group != F1-scanner || $failure = scanner ]] || continue
+        [[ $group != F1-parser || $failure != scanner ]] || continue
+        for mode in workflow certificate linked; do
+            artifacts=workflow.js
+            [[ $mode != linked ]] || artifacts=workflow.ir
+            [[ $mode != certificate ]] || artifacts='workflow.js workflow.vcert'
+            for artifact in $artifacts; do
+                for alias in symlink hardlink; do
+                    directory="$tmp/error-$failure-$mode-$artifact-$alias"
+                    mkdir -p "$directory/out"
+                    for file in workflow.ir workflow.js workflow.html workflow.vcert; do
+                        printf 'stale success\n' > "$directory/out/$file"
+                    done
+                    printf 'module A {}\n' > "$directory/out/$artifact"
+                    if [[ $alias = symlink ]]; then ln -s "out/$artifact" "$directory/a.vista";
+                    else ln "$directory/out/$artifact" "$directory/a.vista"; fi
+                    case $failure in
+                        scanner) printf 'workflow W { use "a.vista" as A start A } @\n';;
+                        parser) printf 'workflow W { use "a.vista" as A start A\n';;
+                        parser-before-use) printf 'workflow W { route -> use "a.vista" as A }\n';;
+                    esac > "$directory/main.vista"
+                    expect_exit 1 "$binary" "$directory/main.vista" --emit "$mode" --out-dir "$directory/out"
+                    cmp "$directory/a.vista" <(printf 'module A {}\n') || fail "$failure/$mode/$alias lost module input"
+                    cmp "$directory/out/$artifact" <(printf 'module A {}\n') || fail "$failure/$mode/$alias removed input alias"
+                    if [[ $mode = certificate && $artifact != workflow.vcert ]]; then
+                        test ! -e "$directory/out/workflow.vcert" || fail 'safe stale certificate survived'
+                    fi
+                    if [[ $mode = certificate && $artifact = workflow.vcert ]]; then
+                        grep -q 'preserv' "$tmp/log" || fail 'protected certificate needs explicit warning'
+                    fi
+                done
+            done
+        done
+    done
+    echo 'F1 malformed-source module aliases preserved; safe stale certificates cleared.'
+fi
 if [[ $group = F5 || $group = all ]]; then
     printf 'workflow W { use "a.vista" as A use "b.vista" as B start A route A -> B when present(A.attachment) }\n' > "$tmp/presence.vista"
     expect_exit 0 "$binary" "$tmp/presence.vista" --emit ast
@@ -51,6 +108,24 @@ JS
     echo 'F5 qualified/local/contextual presence and actual Node/certificate regressions passed.'
 fi
 if [[ $group = F1 || $group = all ]]; then
+    for failure in scanner parser; do
+        for mode in workflow certificate linked; do
+            directory="$tmp/safe-$failure-$mode"
+            mkdir -p "$directory/out"
+            cp "$tmp/a.vista" "$directory/a.vista"
+            for file in workflow.ir workflow.js workflow.html workflow.vcert; do printf stale > "$directory/out/$file"; done
+            if [[ $failure = scanner ]]; then printf 'workflow W { use "a.vista" as A start A } @\n' > "$directory/main.vista";
+            else printf 'workflow W { use "a.vista" as A start A\n' > "$directory/main.vista"; fi
+            expect_exit 1 "$binary" "$directory/main.vista" --emit "$mode" --out-dir "$directory/out"
+            cmp "$tmp/a.vista" "$directory/a.vista"
+            test ! -e "$directory/out/workflow.ir" || fail 'safe stale IR survived'
+            if [[ $mode != linked ]]; then
+                test ! -e "$directory/out/workflow.js" || fail 'safe stale JS survived'
+                test ! -e "$directory/out/workflow.html" || fail 'safe stale HTML survived'
+            fi
+            if [[ $mode = certificate ]]; then test ! -e "$directory/out/workflow.vcert" || fail 'safe stale certificate survived'; fi
+        done
+    done
     for mode in linked workflow certificate html all module; do
         mkdir -p "$tmp/$mode"
         case $mode in

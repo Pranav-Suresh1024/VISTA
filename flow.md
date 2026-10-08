@@ -13,11 +13,14 @@ main
   reject source identity overlap with mode-touched outputs
   exception-safe source read
   scan_file(source_path)                       [src/vista.l]
-  unless tokens mode or scanner failure: parse_tokens(tokens) [src/parser.cpp]
+  parse_tokens unless tokens mode or non-emitting scanner failure [src/parser.cpp]
+    inventory all Use + StringLiteral tokens using existing string decoder
     yyparse(context)                          [generated from src/vista.y]
       yylex(semantic_value, location, context) [token adapter in src/parser.cpp]
     duplicate module-export check (MOD003)
   reject declared module identity overlaps; capture supplied JS snapshot
+    source errors: protect token-inventoried aliases, clean only safe files
+    ambiguous inventory: preserve outputs, warn old evidence unusable, exit 1
   directory mode: prepare_output_directory -> mode-specific stale cleanup
   format_tokens / scanner diagnostics; tokens mode returns here
   handle already-collected parse diagnostics
@@ -28,7 +31,7 @@ main
 
 `scan_file` invokes the generated Flex scanner; `yylex` above instead adapts its collected tokens for Bison, including decoded string values and source positions. [include/parser.hpp](include/parser.hpp) requires exactly one root for successful parsing. [src/vista.y](src/vista.y) adds module/workflow roots, qualified names and file presence while retaining contextual identifiers.
 
-Exit codes are 0 for success, 1 for language/validation/incomplete-suite failure and 2 for usage, identity overlap or operational filesystem failures. LinkResult, InputLoadResult and the legacy ValidationResult adapter carry operational_failure independently of diagnostic text/codes: missing/read-failed modules and data return 2, malformed source/object/data returns 1. Scanner diagnostics stop before parsing; parse diagnostics stop before semantic/link work. Root/mode checks happen after parsing; unsupported non-form combinations can reach the generic modules/workflows mode error. The scan/parse results discovered during preflight are reused, not executed twice.
+Exit codes are 0 for success, 1 for language/validation/incomplete-suite failure and 2 for usage, valid-source identity overlap or operational filesystem failures. LinkResult, InputLoadResult and the legacy ValidationResult adapter carry operational_failure independently of diagnostic text/codes: missing/read-failed modules and data return 2, malformed source/object/data returns 1. Emitting modes parse scanned tokens even after scanner diagnostics to retain dependency paths; scanner diagnostics remain the primary error and no semantic/link work follows. Parse diagnostics stop before semantic/link work. Root/mode checks happen after parsing; unsupported non-form combinations can reach the generic modules/workflows mode error. The scan/parse results discovered during preflight are reused, not executed twice.
 
 ## Ordinary form path
 
@@ -199,9 +202,11 @@ The submit handler prevents native submission, evaluates the current step, and o
 
 ## Errors and stale-output cleanup
 
-[src/main.cpp](src/main.cpp) checks the top-level source, reads it safely and discovers declared workflow module paths before any output cleanup/write. Existing files use filesystem equivalence (including hardlinks); weak canonical paths resolve existing symlink prefixes before parent components. The exact mode-touched outputs include certificate/probe files where applicable. Any source/module overlap returns 2 without cleanup; intentional supplied-JS aliases are captured before cleanup. `clear_generated_artifacts` removes `module.vobj` for module mode, `form.html` for HTML, or seven named demonstration files for `all`; linked mode removes `workflow.ir`; `clear_workflow_artifacts` attempts all of `workflow.ir`, `workflow.html`, `workflow.js`. Missing/read-failed sources take the normal cleanup path; scanner/parser/semantic/link failures also clear stale artifacts when cleanup succeeds. [include/file_io.hpp](include/file_io.hpp) shares exception-safe binary reads between producer, linker and data loading; module compilation reuses the source bytes already read.
+[src/main.cpp](src/main.cpp) checks the top-level source, reads it safely and discovers declared workflow module paths before any output cleanup/write. Existing files use filesystem equivalence (including hardlinks); weak canonical paths resolve existing symlink prefixes before parent components. The exact mode-touched outputs include certificate/probe files where applicable. Top-level source overlap and valid-source module overlap return 2 without cleanup; intentional supplied-JS aliases are captured before normal cleanup. `clear_generated_artifacts` removes `module.vobj` for module mode, `form.html` for HTML, or seven named demonstration files for `all`; linked mode removes `workflow.ir`; `clear_workflow_artifacts` attempts all of `workflow.ir`, `workflow.html`, `workflow.js`. Missing/read-failed sources take the normal cleanup path; scanner/parser failures remove only known-safe artifacts as detailed below, and semantic/link failures clear stale artifacts when cleanup succeeds. [include/file_io.hpp](include/file_io.hpp) shares exception-safe binary reads between producer, linker and data loading; module compilation reuses the source bytes already read.
 
 `remove_artifact` reports filesystem errors. Workflow write failures attempt all three removals, including a partly written file. Removal refusal is an explicit failure and may leave files; output is not atomic and no directory is recursively deleted. Legacy `all` may leave already-written diagnostic/intermediate artifacts from the failing attempt. [src/diagnostic.cpp](src/diagnostic.cpp), `format_diagnostic`, supplies positioned scanner/parser/semantic/link messages; workflow validation prints its observation plus messages instead of using that stderr path.
+
+Residual F1 correction: `ParseResult.module_input_paths` retains decoded candidate paths from all scanned `Use`/`StringLiteral` pairs before Bison runs, so an unfinished root or early parser stop does not erase the inventory. `module_inputs_known` is conservatively false for a `Use` without a string operand; LEX002 also makes inventory unknown. On source errors with known aliases, the existing filesystem identity check protects each aliased artifact while safe known stale files (including a nonaliased certificate) are removed. Probe files retain their prior cleanup boundary. Source errors return 1; removal refusal returns 2. Unknown inventories bypass every output write/removal and warn that old evidence is unusable. A protected certificate also remains unusable. Normal no-alias error cleanup, valid-source refusal and supplied-JS snapshot behavior are retained.
 
 ## Test entry points and evidence boundary
 

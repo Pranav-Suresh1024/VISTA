@@ -138,6 +138,12 @@ namespace vista {
 
 ParseResult parse_tokens(const std::vector<Token>& tokens) {
     ParseResult result;
+    for (std::size_t i = 0; i < tokens.size(); ++i) {
+        if (tokens[i].kind != TokenKind::Use) continue;
+        if (i + 1 < tokens.size() && tokens[i + 1].kind == TokenKind::StringLiteral)
+            result.module_input_paths.push_back(decode_string(tokens[i + 1].lexeme));
+        else result.module_inputs_known = false;
+    }
     ParserContext context(tokens, result);
     const int status = yyparse(context);
     if (status != 0 && result.diagnostics.empty()) {

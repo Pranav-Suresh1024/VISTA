@@ -129,3 +129,5 @@ README.md      Setup and current progress
 - `2`: invalid usage, input/output identity overlap, or operational file/runtime/probe failure, including module and data reads
 
 Every emitting mode checks source and declared module input identities against its touched outputs before cleanup or writes. Supplied JavaScript may intentionally alias `workflow.js`: its bytes are captured before cleanup. Workflow routes accept `present(A.attachment)` for exported file fields (missing/empty is absent; any nonempty value is present). Every source numeric literal must fit the canonical parser, including field-free and runtime-unreached expressions; unsupported literals cannot receive PASS. Malformed source, objects and data remain exit 1.
+
+On scanner/parser failure, token-derived module paths still protect input aliases: only safe stale artifacts are removed. An incomplete dependency inventory preserves outputs and prints an unusable-evidence warning. A certificate that itself aliases a module input must also be preserved; do not reuse evidence from a failed invocation.
