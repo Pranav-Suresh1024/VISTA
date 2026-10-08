@@ -8,19 +8,7 @@ if ! ./build/vista examples/vista_link/scholarship.workflow.vista --emit workflo
     echo 'FAIL: workflow emission unavailable'; exit 1
 fi
 for file in workflow.ir workflow.js workflow.html; do test -s "$tmp/demo/$file"; done
-for group in numeric textual selection; do
-    case "$group" in
-        numeric) types='integer|decimal|date|boolean';;
-        textual) types='text|textarea|email|phone|boolean';;
-        selection) types='choice|file|boolean';;
-    esac
-    mkdir "$tmp/$group-source"
-    cp examples/vista_link/{all_type_routes.workflow,applicant}.vista "$tmp/$group-source/"
-    awk -v types="$types" '$1 != "field" || $3 ~ ("^(" types ")$")' examples/vista_link/all_type_routes.vista > "$tmp/$group-source/all_type_routes.vista"
-done
-grep -h '^  field ' "$tmp/"*-source/all_type_routes.vista | sort -u > "$tmp/group-fields"
-grep '^  field ' examples/vista_link/all_type_routes.vista | sort > "$tmp/original-fields"
-cmp "$tmp/original-fields" "$tmp/group-fields"
+bash tests/create_vista_link_groups.sh "$tmp"
 cat > "$tmp/probe.cpp" <<'CPP'
 #include "codegen.hpp"
 #include "evaluator.hpp"
